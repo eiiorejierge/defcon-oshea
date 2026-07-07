@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const usernameInput = document.getElementById('username-input');
 
   // DOM Elements - Chat Area
-  const chatScreen = document.getElementById('chat-screen');
+  const chatShell = document.getElementById('chat-shell');
   const activeUsersCount = document.getElementById('active-users-count');
   const adminToggleBtn = document.getElementById('admin-toggle-btn');
   const adminTabs = document.getElementById('admin-tabs');
@@ -38,11 +38,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const clearFilterBtn = document.getElementById('clear-filter-btn');
   const saveChatsBtn = document.getElementById('save-chats-btn');
 
-  // DOM Elements - Active Users & Header
+  // DOM Elements - Members & Header
   const headerUsername = document.getElementById('header-username');
-  const usersToggleBtn = document.getElementById('users-toggle-btn');
-  const usersModal = document.getElementById('users-modal');
-  const closeUsersModalBtn = document.getElementById('close-users-modal-btn');
+  const membersCount = document.getElementById('members-count');
   const usersList = document.getElementById('users-list');
 
   // DOM Elements - Admin Modal
@@ -79,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // UI transition
       onboardingScreen.classList.add('hidden');
-      chatScreen.classList.remove('hidden');
+      chatShell.classList.remove('hidden');
       focusElement(messageInput);
     }
   });
@@ -115,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUserCount(members.count);
         updateActiveUsersList();
         messagesContainer.appendChild(createSystemMessageElement({
-          text: `Connected to Aether Room as ${currentUsername}. Session is active.`
+          text: `Connected to The Lounge as ${currentUsername}. Session is active.`
         }));
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
       });
@@ -192,10 +190,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
 
-      // Real-time typing event received from another client
-      presenceChannel.bind('client-typing', (data) => {
-        if (data.username === currentUsername) return;
-        
+      // Real-time typing event relayed via the server
+      presenceChannel.bind('typing', (data) => {
+        if (!data || data.username === currentUsername) return;
+
         if (data.isTyping) {
           activeTypingUsers.add(data.username);
         } else {
@@ -211,9 +209,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Update user count element
+  // Update user count element (header + members sidebar badge)
   function updateUserCount(count) {
     activeUsersCount.textContent = `${count} active user${count === 1 ? '' : 's'}`;
+    if (membersCount) {
+      membersCount.textContent = count;
+    }
   }
 
   // --- Real-time Messaging Submission ---
@@ -225,9 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (isCurrentlyTyping) {
         isCurrentlyTyping = false;
         clearTimeout(typingTimeout);
-        if (presenceChannel) {
-          presenceChannel.trigger('client-typing', { username: currentUsername, isTyping: false });
-        }
+        sendTypingState(false);
       }
 
       fetch('/api/messages', {
@@ -497,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    let fileContent = `AETHER CHATROOM ARCHIVE LOG\r\n`;
+    let fileContent = `NOIR — THE LOUNGE ARCHIVE LOG\r\n`;
     fileContent += `Export Date: ${new Date().toLocaleString()}\r\n`;
     fileContent += `==================================================\r\n\r\n`;
 
@@ -551,22 +550,6 @@ document.addEventListener('DOMContentLoaded', () => {
       usersList.appendChild(li);
     });
   }
-
-  // Active Users Modal Bindings
-  usersToggleBtn.addEventListener('click', () => {
-    updateActiveUsersList();
-    usersModal.classList.remove('hidden');
-  });
-
-  closeUsersModalBtn.addEventListener('click', () => {
-    usersModal.classList.add('hidden');
-  });
-
-  usersModal.addEventListener('click', (e) => {
-    if (e.target === usersModal) {
-      usersModal.classList.add('hidden');
-    }
-  });
 
   // Helper to render/update typing indicators
   function updateTypingIndicator() {
@@ -624,19 +607,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Relay typing state through the server so it works without Pusher client events
+  function sendTypingState(isTyping) {
+    if (!currentUsername) return;
+    fetch('/api/typing', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ username: currentUsername, isTyping })
+    }).catch(err => console.error('Error sending typing state:', err));
+  }
+
   // --- Message Input Typing Event Triggers ---
   messageInput.addEventListener('input', () => {
-    if (!presenceChannel || !currentUsername) return;
+    if (!currentUsername) return;
 
     if (!isCurrentlyTyping) {
       isCurrentlyTyping = true;
-      presenceChannel.trigger('client-typing', { username: currentUsername, isTyping: true });
+      sendTypingState(true);
     }
 
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => {
       isCurrentlyTyping = false;
-      presenceChannel.trigger('client-typing', { username: currentUsername, isTyping: false });
+      sendTypingState(false);
     }, 2500);
   });
 
@@ -645,10 +640,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape') {
       if (!adminModal.classList.contains('hidden')) {
         adminModal.classList.add('hidden');
-        focusElement(messageInput);
-      }
-      if (!usersModal.classList.contains('hidden')) {
-        usersModal.classList.add('hidden');
         focusElement(messageInput);
       }
     }

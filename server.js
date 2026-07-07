@@ -171,6 +171,24 @@ app.post('/api/messages', (req, res) => {
     });
 });
 
+// Endpoint to relay typing indicator state to all connected clients.
+// Routing this through the server (instead of Pusher client events) means the
+// typing indicator works without enabling client events in the Pusher dashboard.
+app.post('/api/typing', (req, res) => {
+  const { username, isTyping } = req.body;
+  const cleanUsername = (username || 'Anonymous').trim().substring(0, 25);
+
+  pusher.trigger('presence-chat', 'typing', {
+    username: cleanUsername,
+    isTyping: !!isTyping
+  })
+    .then(() => res.json({ success: true }))
+    .catch((err) => {
+      console.error('Typing relay error:', err);
+      res.status(500).json({ error: 'Failed to relay typing state.' });
+    });
+});
+
 // Endpoint to notify when a user joins
 app.post('/api/join', (req, res) => {
   const { username } = req.body;
