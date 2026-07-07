@@ -216,7 +216,7 @@ app.post('/pusher/auth', (req, res) => {
 
   // Presence channel metadata
   const presenceData = {
-    user_id: socketId,
+    user_id: username, // Use username to allow Pusher to de-duplicate refreshes and multiple tabs
     user_info: {
       name: username
     }
