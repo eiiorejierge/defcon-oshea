@@ -1114,3 +1114,270 @@ body {
     border-radius: 0;
   }
 }
+
+/* ============================================================
+   Feature add-ons: announcements, slash commands, minigames
+   ============================================================ */
+
+/* --- Admin announcement banner --- */
+#announcement-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.ann-icon {
+  color: var(--white);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+#announcement-text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-main);
+  font-weight: 500;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.ann-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  flex-shrink: 0;
+  transition: var(--transition-smooth);
+}
+
+.ann-dismiss:hover {
+  color: var(--white);
+}
+
+/* --- Action / emote messages (/me, /roll, /flip …) --- */
+.action-message {
+  align-self: center;
+  text-align: center;
+  max-width: 90%;
+  margin: 2px 0;
+  animation: fade-in 0.4s ease forwards;
+}
+
+.action-text {
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+/* --- Ghost button (used in announce modal) --- */
+.ghost-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-family: var(--font-family);
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.ghost-btn:hover {
+  color: var(--white);
+  border-color: var(--line-strong);
+  background: var(--surface-inset);
+}
+
+/* --- Slash command hint bar --- */
+#chat-footer {
+  position: relative;
+}
+
+#command-hints {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: calc(100% - 10px);
+  background: var(--surface-solid);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+  z-index: 20;
+}
+
+.command-hint {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition-smooth);
+}
+
+.command-hint:last-child {
+  border-bottom: none;
+}
+
+.command-hint:hover {
+  background: var(--surface-inset-hover);
+}
+
+.command-hint-name {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 12.5px;
+  color: var(--white);
+  font-weight: 600;
+}
+
+.command-hint-desc {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+/* --- Minigame: invite card --- */
+.game-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  max-width: 340px;
+  padding: 14px 18px;
+  background: var(--surface-inset);
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+}
+
+.game-card-title {
+  font-size: 13px;
+  color: var(--text-main);
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.game-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.game-btn {
+  padding: 7px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.game-btn.accept {
+  background: var(--white);
+  color: #0a0a0a;
+  border-color: var(--white);
+}
+
+.game-btn.accept:hover {
+  background: #eaeaea;
+}
+
+.game-btn.decline {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.game-btn.decline:hover {
+  color: var(--white);
+  border-color: var(--line-focus);
+}
+
+.game-card-note {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* --- Minigame: board --- */
+.game-board-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 18px;
+  background: var(--surface-inset);
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+}
+
+.game-board-header {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-align: center;
+}
+
+.game-board-status {
+  font-size: 13px;
+  color: var(--white);
+  font-weight: 600;
+  min-height: 18px;
+}
+
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 62px);
+  grid-template-rows: repeat(3, 62px);
+  gap: 6px;
+}
+
+.game-cell {
+  width: 62px;
+  height: 62px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  color: var(--white);
+  font-family: var(--font-family);
+  font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  transition: var(--transition-smooth);
+}
+
+.game-cell.o {
+  color: var(--text-muted);
+}
+
+.game-grid.my-turn .game-cell:not(.filled) {
+  cursor: pointer;
+}
+
+.game-grid.my-turn .game-cell:not(.filled):hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--line-focus);
+}
+
+.game-cell.win {
+  background: var(--white);
+  color: #0a0a0a;
+  border-color: var(--white);
+}
+
+.game-grid.game-over .game-cell {
+  cursor: default;
+}

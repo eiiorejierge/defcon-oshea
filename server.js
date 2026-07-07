@@ -128,12 +128,16 @@ app.post('/pusher/auth', (req, res) => {
   }
 });
 
+// Message kinds broadcast/persisted in the chat stream.
+const MESSAGE_KINDS = ['message', 'action'];
+
 // Endpoint to send a message
 app.post('/api/messages', (req, res) => {
-  const { username, text } = req.body;
-  
+  const { username, text, kind } = req.body;
+
   const cleanUsername = (username || 'Anonymous').trim().substring(0, 25);
   const cleanText = (text || '').trim().substring(0, 1000);
+  const cleanKind = MESSAGE_KINDS.includes(kind) ? kind : 'message';
 
   if (!cleanText) {
     return res.status(400).json({ error: 'Message content is required.' });
@@ -143,6 +147,7 @@ app.post('/api/messages', (req, res) => {
     id: `msg-${Date.now()}-${Math.random()}`,
     username: cleanUsername,
     text: cleanText,
+    kind: cleanKind,
     timestamp: Date.now()
   };
 
@@ -186,6 +191,68 @@ app.post('/api/typing', (req, res) => {
     .catch((err) => {
       console.error('Typing relay error:', err);
       res.status(500).json({ error: 'Failed to relay typing state.' });
+    });
+});
+
+// Relay minigame actions (invite / accept / decline / move) to all clients.
+// Game state is resolved on the clients; the server only broadcasts events.
+app.post('/api/game', (req, res) => {
+  const payload = req.body || {};
+  const type = typeof payload.type === 'string' ? payload.type : '';
+  const allowed = ['invite', 'accept', 'decline', 'move'];
+
+  if (!allowed.includes(type)) {
+    return res.status(400).json({ error: 'Unknown game action.' });
+  }
+
+  pusher.trigger('presence-chat', 'game', payload)
+    .then(() => res.json({ success: true }))
+    .catch((err) => {
+      console.error('Game relay error:', err);
+      res.status(500).json({ error: 'Failed to relay game action.' });
+    });
+});
+
+// Current pinned announcement (in-memory; latest wins). Empty string = none.
+let currentAnnouncement = null;
+
+// Late-joining clients fetch the active announcement so the banner shows for them too.
+app.get('/api/announcement', (req, res) => {
+  res.json({ announcement: currentAnnouncement });
+});
+
+// Admin-only: post or clear a broadcast announcement banner.
+app.post('/api/announce', (req, res) => {
+  const { adminCode, text } = req.body;
+
+  if (adminCode !== ADMIN_CODE) {
+    return res.status(401).json({ error: 'Invalid admin passcode. Access denied.' });
+  }
+
+  const cleanText = (text || '').trim().substring(0, 300);
+
+  if (!cleanText) {
+    // Empty text clears the current announcement.
+    currentAnnouncement = null;
+    return pusher.trigger('presence-chat', 'announcement', { announcement: null })
+      .then(() => res.json({ success: true, announcement: null }))
+      .catch((err) => {
+        console.error('Announcement relay error:', err);
+        res.status(500).json({ error: 'Failed to clear announcement.' });
+      });
+  }
+
+  currentAnnouncement = {
+    id: `ann-${Date.now()}`,
+    text: cleanText,
+    timestamp: Date.now()
+  };
+
+  pusher.trigger('presence-chat', 'announcement', { announcement: currentAnnouncement })
+    .then(() => res.json({ success: true, announcement: currentAnnouncement }))
+    .catch((err) => {
+      console.error('Announcement relay error:', err);
+      res.status(500).json({ error: 'Failed to broadcast announcement.' });
     });
 });
 

@@ -50,6 +50,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const adminCodeInput = document.getElementById('admin-code-input');
   const adminErrorMsg = document.getElementById('admin-error-msg');
 
+  // DOM Elements - Announcements
+  const announceBtn = document.getElementById('announce-btn');
+  const announcementBanner = document.getElementById('announcement-banner');
+  const announcementText = document.getElementById('announcement-text');
+  const dismissAnnouncementBtn = document.getElementById('dismiss-announcement-btn');
+  const announceModal = document.getElementById('announce-modal');
+  const closeAnnounceModalBtn = document.getElementById('close-announce-modal-btn');
+  const announceForm = document.getElementById('announce-form');
+  const announceInput = document.getElementById('announce-input');
+  const clearAnnounceBtn = document.getElementById('clear-announce-btn');
+
+  // DOM Elements - Slash command hints
+  const commandHints = document.getElementById('command-hints');
+
+  // Minigame state (client-resolved; server only relays events)
+  const activeGames = new Map(); // gameId -> { playerX, playerO, board, turn, status, boardEl }
+
   // Focus utility
   const focusElement = (el) => {
     if (el) setTimeout(() => el.focus(), 50);
@@ -201,6 +218,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         updateTypingIndicator();
       });
+
+      // Broadcast announcement banner updates
+      presenceChannel.bind('announcement', (data) => {
+        renderAnnouncement(data ? data.announcement : null);
+      });
+
+      // Minigame events (invite / accept / decline / move)
+      presenceChannel.bind('game', (data) => {
+        handleGameEvent(data);
+      });
+
+      // Pull any active announcement so late joiners see the banner too
+      fetch('/api/announcement')
+        .then(res => res.json())
+        .then(data => renderAnnouncement(data.announcement))
+        .catch(() => {});
     } catch (error) {
       console.error('Error initializing Pusher config:', error);
       messagesContainer.appendChild(createSystemMessageElement({
@@ -217,39 +250,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Send a chat message (optionally as an 'action' kind) to the server.
+  function sendChatMessage(text, kind = 'message') {
+    return fetch('/api/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ username: currentUsername, text, kind })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) {
+        console.error('API Error sending message:', data.error);
+      }
+      return data;
+    })
+    .catch(err => console.error('Error sending message:', err));
+  }
+
   // --- Real-time Messaging Submission ---
   messageForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = messageInput.value.trim();
-    if (text) {
-      // Reset typing state immediately
-      if (isCurrentlyTyping) {
-        isCurrentlyTyping = false;
-        clearTimeout(typingTimeout);
-        sendTypingState(false);
-      }
+    if (!text) return;
 
-      fetch('/api/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          username: currentUsername,
-          text: text
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          messageInput.value = '';
-          focusElement(messageInput);
-        } else {
-          console.error('API Error sending message:', data.error);
-        }
-      })
-      .catch(err => console.error('Error sending message:', err));
+    // Reset typing state immediately
+    if (isCurrentlyTyping) {
+      isCurrentlyTyping = false;
+      clearTimeout(typingTimeout);
+      sendTypingState(false);
     }
+
+    hideCommandHints();
+
+    // Slash commands are intercepted before hitting the message API
+    if (text.startsWith('/')) {
+      messageInput.value = '';
+      handleSlashCommand(text);
+      focusElement(messageInput);
+      return;
+    }
+
+    sendChatMessage(text);
+    messageInput.value = '';
+    focusElement(messageInput);
   });
 
   // Helper to format time (HH:MM)
@@ -268,6 +313,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Helper to create and return a message element securely
   function createMessageElement(msg, isSelf, isArchive = false) {
+    // Action messages (/me, dice rolls, etc.) render as a centered emote line
+    if (msg.kind === 'action') {
+      const actionDiv = document.createElement('div');
+      actionDiv.classList.add('action-message');
+      const textSpan = document.createElement('span');
+      textSpan.classList.add('action-text');
+      textSpan.textContent = `${isSelf ? 'You' : msg.username} ${msg.text}`;
+      actionDiv.appendChild(textSpan);
+      return actionDiv;
+    }
+
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message');
     if (isArchive) {
@@ -379,6 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
           adminModal.classList.add('hidden');
           adminTabs.classList.remove('hidden');
           adminToggleBtn.classList.add('active');
+          announceBtn.classList.remove('hidden');
           
           // Cache history messages
           archiveMessages = data.messages || [];
@@ -623,6 +680,9 @@ document.addEventListener('DOMContentLoaded', () => {
   messageInput.addEventListener('input', () => {
     if (!currentUsername) return;
 
+    // Show slash-command hints while composing a command
+    updateCommandHints(messageInput.value);
+
     if (!isCurrentlyTyping) {
       isCurrentlyTyping = true;
       sendTypingState(true);
@@ -635,13 +695,445 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 2500);
   });
 
-  // Global Keybind: Esc closes modal
+  // Global Keybind: Esc closes modals / hint bar
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (!adminModal.classList.contains('hidden')) {
         adminModal.classList.add('hidden');
         focusElement(messageInput);
       }
+      if (announceModal && !announceModal.classList.contains('hidden')) {
+        announceModal.classList.add('hidden');
+        focusElement(messageInput);
+      }
+      hideCommandHints();
     }
   });
+
+  // =====================================================================
+  //  Slash commands
+  // =====================================================================
+  const SLASH_COMMANDS = [
+    { name: '/help', usage: '/help', desc: 'List all commands' },
+    { name: '/me', usage: '/me <action>', desc: 'Send an emote, e.g. /me waves' },
+    { name: '/shrug', usage: '/shrug [text]', desc: 'Append ¯\\_(ツ)_/¯' },
+    { name: '/roll', usage: '/roll [max]', desc: 'Roll a die (default 6)' },
+    { name: '/flip', usage: '/flip', desc: 'Flip a coin' },
+    { name: '/8ball', usage: '/8ball <question>', desc: 'Ask the magic 8-ball' },
+    { name: '/ttt', usage: '/ttt <user>', desc: 'Challenge someone to Tic-Tac-Toe' },
+    { name: '/clear', usage: '/clear', desc: 'Clear your local chat view' }
+  ];
+
+  const EIGHT_BALL = [
+    'It is certain.', 'Without a doubt.', 'Yes — definitely.', 'Most likely.',
+    'Signs point to yes.', 'Reply hazy, try again.', 'Ask again later.',
+    'Cannot predict now.', "Don't count on it.", 'My reply is no.',
+    'Very doubtful.', 'Outlook not so good.'
+  ];
+
+  function localSystemMessage(text) {
+    messagesContainer.appendChild(createSystemMessageElement({ text }));
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  function handleSlashCommand(raw) {
+    const parts = raw.slice(1).trim().split(/\s+/);
+    const cmd = (parts.shift() || '').toLowerCase();
+    const rest = parts.join(' ').trim();
+
+    switch (cmd) {
+      case 'help':
+        localSystemMessage(
+          'Commands — ' + SLASH_COMMANDS.map(c => c.usage).join('  ·  ')
+        );
+        break;
+      case 'me':
+        if (!rest) return localSystemMessage('Usage: /me <action>');
+        sendChatMessage(rest, 'action');
+        break;
+      case 'shrug':
+        sendChatMessage((rest ? rest + ' ' : '') + '¯\\_(ツ)_/¯');
+        break;
+      case 'roll': {
+        const max = Math.max(2, Math.min(1000, parseInt(rest, 10) || 6));
+        const result = Math.floor(Math.random() * max) + 1;
+        sendChatMessage(`🎲 rolled ${result} (1–${max})`, 'action');
+        break;
+      }
+      case 'flip':
+        sendChatMessage(`🪙 flipped ${Math.random() < 0.5 ? 'Heads' : 'Tails'}`, 'action');
+        break;
+      case '8ball':
+        if (!rest) return localSystemMessage('Usage: /8ball <question>');
+        sendChatMessage(`🎱 ${EIGHT_BALL[Math.floor(Math.random() * EIGHT_BALL.length)]}`, 'action');
+        break;
+      case 'ttt':
+      case 'tictactoe':
+        startTicTacToe(rest.replace(/^@/, ''));
+        break;
+      case 'clear':
+        clearLocalMessages();
+        break;
+      default:
+        localSystemMessage(`Unknown command: /${cmd}. Try /help`);
+    }
+  }
+
+  function clearLocalMessages() {
+    messagesContainer.innerHTML = '';
+    localSystemMessage('Local view cleared. Server history is unaffected.');
+  }
+
+  // --- Command hint bar ---
+  function updateCommandHints(value) {
+    if (!value.startsWith('/') || value.includes(' ')) {
+      hideCommandHints();
+      return;
+    }
+    const q = value.toLowerCase();
+    const matches = SLASH_COMMANDS.filter(c => c.name.startsWith(q));
+    if (matches.length === 0) {
+      hideCommandHints();
+      return;
+    }
+    commandHints.innerHTML = '';
+    matches.forEach(c => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.classList.add('command-hint');
+      const name = document.createElement('span');
+      name.classList.add('command-hint-name');
+      name.textContent = c.usage;
+      const desc = document.createElement('span');
+      desc.classList.add('command-hint-desc');
+      desc.textContent = c.desc;
+      row.appendChild(name);
+      row.appendChild(desc);
+      row.addEventListener('click', () => {
+        messageInput.value = c.name + ' ';
+        hideCommandHints();
+        focusElement(messageInput);
+      });
+      commandHints.appendChild(row);
+    });
+    commandHints.classList.remove('hidden');
+  }
+
+  function hideCommandHints() {
+    commandHints.classList.add('hidden');
+    commandHints.innerHTML = '';
+  }
+
+  // =====================================================================
+  //  Admin announcements
+  // =====================================================================
+  function renderAnnouncement(announcement) {
+    if (!announcement || !announcement.text) {
+      announcementBanner.classList.add('hidden');
+      announcementText.textContent = '';
+      announcementBanner.removeAttribute('data-ann-id');
+      return;
+    }
+    announcementText.textContent = announcement.text;
+    announcementBanner.setAttribute('data-ann-id', announcement.id || '');
+    announcementBanner.classList.remove('hidden');
+  }
+
+  if (announceBtn) {
+    announceBtn.addEventListener('click', () => {
+      if (!isAdminAuthenticated) return;
+      announceInput.value = announcementText.textContent || '';
+      announceModal.classList.remove('hidden');
+      focusElement(announceInput);
+    });
+  }
+
+  if (closeAnnounceModalBtn) {
+    closeAnnounceModalBtn.addEventListener('click', () => {
+      announceModal.classList.add('hidden');
+      focusElement(messageInput);
+    });
+  }
+
+  if (announceModal) {
+    announceModal.addEventListener('click', (e) => {
+      if (e.target === announceModal) {
+        announceModal.classList.add('hidden');
+        focusElement(messageInput);
+      }
+    });
+  }
+
+  if (announceForm) {
+    announceForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = announceInput.value.trim();
+      if (!text) return;
+      postAnnouncement(text);
+      announceModal.classList.add('hidden');
+      focusElement(messageInput);
+    });
+  }
+
+  if (clearAnnounceBtn) {
+    clearAnnounceBtn.addEventListener('click', () => {
+      postAnnouncement('');
+      announceModal.classList.add('hidden');
+      focusElement(messageInput);
+    });
+  }
+
+  if (dismissAnnouncementBtn) {
+    // Dismiss only hides the banner locally; it does not clear it for others
+    dismissAnnouncementBtn.addEventListener('click', () => {
+      announcementBanner.classList.add('hidden');
+    });
+  }
+
+  function postAnnouncement(text) {
+    fetch('/api/announce', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminCode: currentAdminCode, text })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) {
+        console.error('Announcement error:', data.error);
+        localSystemMessage(data.error || 'Failed to post announcement.');
+      }
+    })
+    .catch(err => console.error('Error posting announcement:', err));
+  }
+
+  // =====================================================================
+  //  Tic-Tac-Toe minigame
+  // =====================================================================
+  const WIN_LINES = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
+  ];
+
+  function relayGame(payload) {
+    fetch('/api/game', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(err => console.error('Error relaying game action:', err));
+  }
+
+  function findMemberByName(name) {
+    if (!presenceChannel || !presenceChannel.members || !name) return null;
+    let found = null;
+    presenceChannel.members.each((m) => {
+      if (m.info.name.toLowerCase() === name.toLowerCase()) found = m.info.name;
+    });
+    return found;
+  }
+
+  function startTicTacToe(targetRaw) {
+    const target = (targetRaw || '').trim();
+    if (!target) return localSystemMessage('Usage: /ttt <user> — challenge someone online.');
+    if (target.toLowerCase() === currentUsername.toLowerCase()) {
+      return localSystemMessage("You can't challenge yourself.");
+    }
+    const opponent = findMemberByName(target);
+    if (!opponent) {
+      return localSystemMessage(`"${target}" isn't online. Pick someone from the members list.`);
+    }
+    const gameId = `ttt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    relayGame({ type: 'invite', gameId, from: currentUsername, to: opponent });
+  }
+
+  function handleGameEvent(data) {
+    if (!data || !data.gameId) return;
+    switch (data.type) {
+      case 'invite':
+        renderGameInvite(data);
+        break;
+      case 'decline':
+        if (data.from === currentUsername || data.to === currentUsername) {
+          localSystemMessage(`${data.by || data.to} declined the Tic-Tac-Toe challenge.`);
+        }
+        break;
+      case 'accept':
+        startGameBoard(data);
+        break;
+      case 'move':
+        applyGameMove(data);
+        break;
+    }
+  }
+
+  function renderGameInvite(data) {
+    const card = document.createElement('div');
+    card.classList.add('game-card', 'system-message');
+
+    const title = document.createElement('div');
+    title.classList.add('game-card-title');
+    title.textContent = `${data.from} challenged ${data.to} to Tic-Tac-Toe`;
+    card.appendChild(title);
+
+    if (data.to === currentUsername) {
+      const actions = document.createElement('div');
+      actions.classList.add('game-card-actions');
+
+      const accept = document.createElement('button');
+      accept.classList.add('game-btn', 'accept');
+      accept.textContent = 'Accept';
+      accept.addEventListener('click', () => {
+        actions.remove();
+        // Inviter is X, invitee is O
+        relayGame({ type: 'accept', gameId: data.gameId, playerX: data.from, playerO: data.to });
+      });
+
+      const decline = document.createElement('button');
+      decline.classList.add('game-btn', 'decline');
+      decline.textContent = 'Decline';
+      decline.addEventListener('click', () => {
+        actions.remove();
+        relayGame({ type: 'decline', gameId: data.gameId, from: data.from, to: data.to, by: currentUsername });
+      });
+
+      actions.appendChild(accept);
+      actions.appendChild(decline);
+      card.appendChild(actions);
+    } else if (data.from !== currentUsername) {
+      const note = document.createElement('div');
+      note.classList.add('game-card-note');
+      note.textContent = 'Spectating…';
+      card.appendChild(note);
+    }
+
+    messagesContainer.appendChild(card);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  function startGameBoard(data) {
+    if (activeGames.has(data.gameId)) return;
+
+    const game = {
+      playerX: data.playerX,
+      playerO: data.playerO,
+      board: Array(9).fill(null),
+      turn: 'X',
+      status: 'playing',
+      boardEl: null
+    };
+
+    const card = document.createElement('div');
+    card.classList.add('game-board-card', 'system-message');
+
+    const header = document.createElement('div');
+    header.classList.add('game-board-header');
+    header.textContent = `Tic-Tac-Toe — ${game.playerX} (X) vs ${game.playerO} (O)`;
+    card.appendChild(header);
+
+    const status = document.createElement('div');
+    status.classList.add('game-board-status');
+    card.appendChild(status);
+
+    const grid = document.createElement('div');
+    grid.classList.add('game-grid');
+    for (let i = 0; i < 9; i++) {
+      const cell = document.createElement('button');
+      cell.classList.add('game-cell');
+      cell.dataset.index = String(i);
+      cell.addEventListener('click', () => attemptMove(data.gameId, i));
+      grid.appendChild(cell);
+    }
+    card.appendChild(grid);
+
+    game.boardEl = { card, status, grid };
+    activeGames.set(data.gameId, game);
+
+    messagesContainer.appendChild(card);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    updateGameStatus(data.gameId);
+  }
+
+  function myMarkFor(game) {
+    if (game.playerX === currentUsername) return 'X';
+    if (game.playerO === currentUsername) return 'O';
+    return null;
+  }
+
+  function attemptMove(gameId, index) {
+    const game = activeGames.get(gameId);
+    if (!game || game.status !== 'playing') return;
+    const myMark = myMarkFor(game);
+    if (!myMark) return; // spectators can't play
+    if (game.turn !== myMark) return; // not your turn
+    if (game.board[index]) return; // occupied
+    relayGame({ type: 'move', gameId, index, mark: myMark, by: currentUsername });
+  }
+
+  function applyGameMove(data) {
+    const game = activeGames.get(data.gameId);
+    if (!game || game.status !== 'playing') return;
+    if (typeof data.index !== 'number' || data.index < 0 || data.index > 8) return;
+    if (game.board[data.index]) return;
+    if (data.mark !== game.turn) return; // enforce turn order consistently
+
+    game.board[data.index] = data.mark;
+    game.turn = data.mark === 'X' ? 'O' : 'X';
+    updateGameBoard(data.gameId);
+
+    const winner = getWinner(game.board);
+    if (winner) {
+      game.status = 'won';
+      updateGameBoard(data.gameId, winner.line);
+    } else if (game.board.every(Boolean)) {
+      game.status = 'draw';
+    }
+    updateGameStatus(data.gameId, winner);
+  }
+
+  function getWinner(board) {
+    for (const line of WIN_LINES) {
+      const [a, b, c] = line;
+      if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+        return { mark: board[a], line };
+      }
+    }
+    return null;
+  }
+
+  function updateGameBoard(gameId, winLine) {
+    const game = activeGames.get(gameId);
+    if (!game || !game.boardEl) return;
+    const cells = game.boardEl.grid.querySelectorAll('.game-cell');
+    cells.forEach((cell, i) => {
+      cell.textContent = game.board[i] || '';
+      cell.classList.toggle('x', game.board[i] === 'X');
+      cell.classList.toggle('o', game.board[i] === 'O');
+      cell.classList.toggle('filled', Boolean(game.board[i]));
+      if (winLine) cell.classList.toggle('win', winLine.includes(i));
+    });
+  }
+
+  function updateGameStatus(gameId, winner) {
+    const game = activeGames.get(gameId);
+    if (!game || !game.boardEl) return;
+    const statusEl = game.boardEl.status;
+    const myMark = myMarkFor(game);
+
+    if (game.status === 'won' && winner) {
+      const winnerName = winner.mark === 'X' ? game.playerX : game.playerO;
+      const iWon = winner.mark === myMark;
+      statusEl.textContent = myMark
+        ? (iWon ? 'You win! 🏆' : `${winnerName} wins.`)
+        : `${winnerName} (${winner.mark}) wins.`;
+      game.boardEl.grid.classList.add('game-over');
+    } else if (game.status === 'draw') {
+      statusEl.textContent = "It's a draw.";
+      game.boardEl.grid.classList.add('game-over');
+    } else {
+      const turnName = game.turn === 'X' ? game.playerX : game.playerO;
+      const yourTurn = myMark && game.turn === myMark;
+      statusEl.textContent = yourTurn ? 'Your turn' : `${turnName}'s turn (${game.turn})`;
+      game.boardEl.grid.classList.toggle('my-turn', Boolean(yourTurn));
+    }
+  }
 });

@@ -73,11 +73,23 @@
           </div>
 
           <div class="chat-header-actions">
+            <button id="announce-btn" class="icon-btn hidden" title="Post Announcement">
+              <i class="fa-solid fa-bullhorn"></i>
+            </button>
             <button id="admin-toggle-btn" class="icon-btn" title="Admin Archive">
               <i class="fa-solid fa-shield-halved"></i>
             </button>
           </div>
         </header>
+
+        <!-- Announcement banner (broadcast by admins) -->
+        <div id="announcement-banner" class="hidden">
+          <i class="fa-solid fa-bullhorn ann-icon"></i>
+          <span id="announcement-text"></span>
+          <button id="dismiss-announcement-btn" class="ann-dismiss" title="Dismiss">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
 
         <!-- View Switcher (Visible only if admin is logged in) -->
         <div id="admin-tabs" class="hidden">
@@ -125,8 +137,9 @@
 
         <!-- Footer / Input Bar -->
         <footer id="chat-footer">
+          <div id="command-hints" class="hidden"></div>
           <form id="message-form">
-            <input type="text" id="message-input" placeholder="Type a message…" maxlength="1000" required autocomplete="off">
+            <input type="text" id="message-input" placeholder="Type a message…  (try /help)" maxlength="1000" required autocomplete="off">
             <button type="submit" id="send-message-btn" class="primary-btn-circle" title="Send Message">
               <i class="fa-solid fa-paper-plane"></i>
             </button>
@@ -176,6 +189,35 @@
             <span>Unlock Archive</span>
             <i class="fa-solid fa-unlock-keyhole"></i>
           </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Announcement Compose Modal (admin only) -->
+  <div id="announce-modal" class="modal-overlay hidden">
+    <div class="modal-content glass-card scale-up">
+      <header class="modal-header">
+        <div class="admin-icon-container">
+          <i class="fa-solid fa-bullhorn"></i>
+        </div>
+        <h3>Post Announcement</h3>
+        <button id="close-announce-modal-btn" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+      </header>
+      <div class="modal-body">
+        <p>Broadcast a pinned announcement to everyone in the room.</p>
+        <form id="announce-form">
+          <div class="input-group">
+            <div class="input-wrapper">
+              <i class="fa-solid fa-bullhorn input-icon"></i>
+              <input type="text" id="announce-input" placeholder="Announcement message" maxlength="300" required autocomplete="off">
+            </div>
+          </div>
+          <button type="submit" class="primary-btn">
+            <span>Broadcast</span>
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+          <button type="button" id="clear-announce-btn" class="ghost-btn">Clear current announcement</button>
         </form>
       </div>
     </div>
