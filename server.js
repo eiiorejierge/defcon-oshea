@@ -182,7 +182,7 @@ app.get('/api/voice-presence', (req, res) => {
 
 // Relay a user's voice join/leave to everyone and track the roster.
 app.post('/api/voice-presence', (req, res) => {
-  const { username, inVoice } = req.body;
+  const { username, inVoice, uid } = req.body;
   const cleanUsername = (username || 'Anonymous').trim().substring(0, 25);
 
   if (inVoice) {
@@ -193,7 +193,8 @@ app.post('/api/voice-presence', (req, res) => {
 
   pusher.trigger('presence-chat', 'voice-presence', {
     username: cleanUsername,
-    inVoice: !!inVoice
+    inVoice: !!inVoice,
+    uid
   })
     .then(() => res.json({ success: true, members: Array.from(voiceMembers) }))
     .catch((err) => {

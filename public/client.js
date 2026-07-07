@@ -305,8 +305,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!data || !data.username) return;
         if (data.inVoice) {
           voiceMembers.add(data.username);
+          if (data.uid) {
+            voiceUidToUsername.set(data.uid, data.username);
+            voiceUsernameToUid.set(data.username, data.uid);
+          }
         } else {
           voiceMembers.delete(data.username);
+          const mappedUid = voiceUsernameToUid.get(data.username);
+          if (mappedUid) {
+            voiceUidToUsername.delete(mappedUid);
+            voiceUsernameToUid.delete(data.username);
+            activeStreamers.delete(mappedUid);
+          }
         }
         renderVoiceRoster();
         updateActiveUsersList();
@@ -781,17 +791,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
       li.appendChild(icon);
       li.appendChild(nameSpan);
+
+      // If this member is actively streaming screen (and not self), show a Watch button next to their name
+      const userUid = voiceUsernameToUid.get(username);
+      if (userUid && activeStreamers.has(userUid) && !isSelf) {
+        const watchBtn = document.createElement('button');
+        watchBtn.className = 'watch-stream-badge-btn';
+        
+        const isWatching = (currentViewingUid === userUid);
+        watchBtn.innerHTML = isWatching 
+          ? `<i class="fa-solid fa-stop"></i> Stop` 
+          : `<i class="fa-solid fa-play"></i> Watch`;
+        
+        watchBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const remoteUser = activeStreamers.get(userUid);
+          if (remoteUser) {
+            if (currentViewingUid === userUid) {
+              hideRemoteScreenShare(remoteUser);
+              currentViewingUid = null;
+              watchBtn.innerHTML = `<i class="fa-solid fa-play"></i> Watch`;
+            } else {
+              showRemoteScreenShare(remoteUser);
+              currentViewingUid = userUid;
+              watchBtn.innerHTML = `<i class="fa-solid fa-stop"></i> Stop`;
+            }
+          }
+        });
+        li.appendChild(watchBtn);
+      }
+
       voiceRosterList.appendChild(li);
     });
   }
 
   // Broadcast our own voice join/leave so everyone's roster updates
-  function announceVoicePresence(inVoice) {
+  function announceVoicePresence(inVoice, uid = 0) {
     if (!currentUsername) return;
     fetch('/api/voice-presence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: currentUsername, inVoice })
+      body: JSON.stringify({ username: currentUsername, inVoice, uid })
     }).catch(err => console.error('Error announcing voice presence:', err));
   }
 
@@ -1374,11 +1414,18 @@ document.addEventListener('DOMContentLoaded', () => {
     client: null,
     localAudioTrack: null,
     localVideoTrack: null, // Screen share track
+    localScreenAudioTrack: null, // Screen share audio track
     joined: false,
     muted: false,
     sharingScreen: false,
     aloneTimer: null
   };
+
+  // Maps and state to resolve screen sharing streams and watch lists
+  const voiceUidToUsername = new Map();
+  const voiceUsernameToUid = new Map();
+  const activeStreamers = new Map(); // maps remoteUid -> remoteUser object
+  let currentViewingUid = null;
 
   const joinVoiceBtn = document.getElementById('join-voice-btn');
   const voiceControls = document.getElementById('voice-controls');
@@ -1416,7 +1463,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function showRemoteScreenShare(user) {
     if (!screenShareViewport) return;
     screenShareViewport.classList.remove('hidden');
-    screenShareLabel.textContent = `${user.uid || 'Someone'} is sharing their screen`;
+    const name = voiceUidToUsername.get(user.uid) || 'Someone';
+    screenShareLabel.textContent = `${name} is sharing screen`;
     screenSharePlayer.innerHTML = "";
     if (user.videoTrack) {
       user.videoTrack.play('screen-share-player');
@@ -1424,6 +1472,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function hideRemoteScreenShare(user) {
+    if (user && user.videoTrack) {
+      user.videoTrack.stop();
+    }
     if (screenShareViewport) {
       screenShareViewport.classList.add('hidden');
       screenSharePlayer.innerHTML = "";
@@ -1489,7 +1540,11 @@ document.addEventListener('DOMContentLoaded', () => {
           user.audioTrack.play();
         }
         if (mediaType === "video") {
-          showRemoteScreenShare(user);
+          activeStreamers.set(user.uid, user);
+          if (currentViewingUid === user.uid) {
+            showRemoteScreenShare(user);
+          }
+          renderVoiceRoster();
         }
         // Check alone status whenever remote user count changes
         checkAloneStatus();
@@ -1497,13 +1552,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
       rtc.client.on("user-unpublished", (user, mediaType) => {
         if (mediaType === "video") {
-          hideRemoteScreenShare(user);
+          activeStreamers.delete(user.uid);
+          if (currentViewingUid === user.uid) {
+            hideRemoteScreenShare(user);
+            currentViewingUid = null;
+          }
+          renderVoiceRoster();
         }
         checkAloneStatus();
       });
 
       rtc.client.on("user-left", (user) => {
-        hideRemoteScreenShare(user);
+        activeStreamers.delete(user.uid);
+        if (currentViewingUid === user.uid) {
+          hideRemoteScreenShare(user);
+          currentViewingUid = null;
+        }
+        renderVoiceRoster();
         checkAloneStatus();
       });
 
@@ -1521,7 +1586,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const uid = (tokenData.uid !== undefined && tokenData.uid !== null) ? tokenData.uid : 0;
 
       // 3. Join channel with the server-provided credentials
-      await rtc.client.join(appId, channel, token, uid);
+      const joinedUid = await rtc.client.join(appId, channel, token, uid);
 
       // 4. Create local audio track from microphone (high-quality voice preset)
       rtc.localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
@@ -1545,7 +1610,7 @@ document.addEventListener('DOMContentLoaded', () => {
       voiceMembers.add(currentUsername);
       renderVoiceRoster();
       updateActiveUsersList();
-      announceVoicePresence(true);
+      announceVoicePresence(true, joinedUid);
 
       // Start initial alone check
       checkAloneStatus();
@@ -1590,6 +1655,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     rtc.joined = false;
     rtc.muted = false;
+    currentViewingUid = null;
+    voiceUidToUsername.clear();
+    voiceUsernameToUid.clear();
+    activeStreamers.clear();
 
     // Reset UI elements
     joinVoiceBtn.classList.remove('hidden');
@@ -1688,7 +1757,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (rtc.sharingScreen) {
         toggleScreenShare();
       } else {
-        if (screenShareViewport) screenShareViewport.classList.add('hidden');
+        if (currentViewingUid) {
+          const remoteUser = activeStreamers.get(currentViewingUid);
+          hideRemoteScreenShare(remoteUser);
+          currentViewingUid = null;
+          renderVoiceRoster();
+        } else {
+          if (screenShareViewport) screenShareViewport.classList.add('hidden');
+        }
       }
     });
   }

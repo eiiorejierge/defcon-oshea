@@ -53,6 +53,17 @@
 
     <!-- Chat Shell: chat card + persistent members sidebar -->
     <div id="chat-shell" class="hidden">
+      <!-- Screen Share Viewport (Docked Side-by-Side) -->
+      <div id="screen-share-viewport" class="hidden">
+        <div class="video-window-header">
+          <span id="screen-share-label">Someone is sharing screen...</span>
+          <button id="close-screen-btn" class="icon-btn" title="Stop/Close Screen Share">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div id="screen-share-player"></div>
+      </div>
+
       <!-- Chat Screen -->
       <section id="chat-screen" class="glass-card">
         <!-- Chat Header -->
@@ -123,17 +134,6 @@
 
         <!-- Messages View -->
         <div id="chat-body">
-          <!-- Screen Share Viewport -->
-          <div id="screen-share-viewport" class="hidden">
-            <div class="video-window-header">
-              <span id="screen-share-label">Someone is sharing screen...</span>
-              <button id="close-screen-btn" class="icon-btn" title="Stop/Close Screen Share">
-                <i class="fa-solid fa-xmark"></i>
-              </button>
-            </div>
-            <div id="screen-share-player"></div>
-          </div>
-
           <!-- Live Messages Container -->
           <div id="messages-container" class="messages-viewport active-view">
             <div class="system-message">
