@@ -2,13 +2,12 @@
   "name": "railway-chat-app",
   "version": "1.0.0",
   "description": "Sleek real-time messaging app with admin history and Pusher synchronization, deployable to Railway.",
-  "main": "desktop.js",
+  "main": "server.js",
   "bin": "server.js",
   "scripts": {
     "start": "node server.js",
     "build:exe": "pkg . --targets node18-win-x64 --output dist/lounge-chat.exe",
-    "desktop": "electron .",
-    "build:app": "electron-packager . lounge-chat --platform=win32 --arch=x64 --out=dist/app --overwrite --ignore=dist"
+    "build:app": "pkg . --targets node18-win-x64 --output dist/lounge-chat-server.exe && C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe /target:winexe /out:dist/lounge-chat.exe launcher.cs"
   },
   "pkg": {
     "assets": [
@@ -29,8 +28,6 @@
     "pusher": "^5.2.0"
   },
   "devDependencies": {
-    "electron": "^43.0.0",
-    "electron-packager": "^17.1.2",
     "pkg": "^5.8.1"
   }
 }
