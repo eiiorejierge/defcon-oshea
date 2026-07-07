@@ -1136,4 +1136,180 @@ document.addEventListener('DOMContentLoaded', () => {
       game.boardEl.grid.classList.toggle('my-turn', Boolean(yourTurn));
     }
   }
+
+  // --- Agora Voice Call Integration (Super Barebones) ---
+  const AGORA_APP_ID = "9f05b55c788b47f3a11622bd8ac945ad";
+  const VOICE_CHANNEL = "lounge-voice";
+
+  let rtc = {
+    client: null,
+    localAudioTrack: null,
+    joined: false,
+    muted: false,
+    aloneTimer: null
+  };
+
+  const joinVoiceBtn = document.getElementById('join-voice-btn');
+  const voiceControls = document.getElementById('voice-controls');
+  const muteVoiceBtn = document.getElementById('mute-voice-btn');
+  const leaveVoiceBtn = document.getElementById('leave-voice-btn');
+  const voiceStatusText = document.getElementById('voice-status-text');
+
+  // Check if we are the only one in the channel
+  function checkAloneStatus() {
+    if (!rtc.joined || !rtc.client) return;
+
+    // Get count of remote users
+    const remoteCount = rtc.client.remoteUsers.length;
+    console.log(`[Agora] Remote users count: ${remoteCount}`);
+
+    if (remoteCount === 0) {
+      // If we are alone and no timer is active, start a 2-minute kick timer
+      if (!rtc.aloneTimer) {
+        console.log("[Agora] User is alone. Starting 2-minute auto-kick timer...");
+        
+        messagesContainer.appendChild(createSystemMessageElement({
+          text: "You are alone in the voice lounge. You will be automatically disconnected in 2 minutes if no one joins."
+        }));
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+        rtc.aloneTimer = setTimeout(() => {
+          console.log("[Agora] Auto-kick timer triggered.");
+          leaveVoiceChannel();
+          messagesContainer.appendChild(createSystemMessageElement({
+            text: "Disconnected from the voice lounge automatically to conserve resources (inactive for 2 minutes)."
+          }));
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 2 * 60 * 1000); // 2 minutes
+      }
+    } else {
+      // Someone is in the channel, clear any active kick timer
+      if (rtc.aloneTimer) {
+        console.log("[Agora] Another user joined. Clearing auto-kick timer.");
+        clearTimeout(rtc.aloneTimer);
+        rtc.aloneTimer = null;
+        
+        messagesContainer.appendChild(createSystemMessageElement({
+          text: "Another user has joined the voice lounge. Auto-kick cancelled."
+        }));
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    }
+  }
+
+  async function joinVoiceChannel() {
+    if (!window.AgoraRTC) {
+      alert("Agora SDK failed to load. Please check your internet connection.");
+      return;
+    }
+
+    try {
+      // 1. Create client
+      rtc.client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+
+      // 2. Setup subscription listeners
+      rtc.client.on("user-published", async (user, mediaType) => {
+        await rtc.client.subscribe(user, mediaType);
+        if (mediaType === "audio") {
+          user.audioTrack.play();
+        }
+        // Check alone status whenever remote user count changes
+        checkAloneStatus();
+      });
+
+      rtc.client.on("user-unpublished", (user) => {
+        checkAloneStatus();
+      });
+
+      rtc.client.on("user-left", (user) => {
+        checkAloneStatus();
+      });
+
+      // 3. Join channel
+      await rtc.client.join(AGORA_APP_ID, VOICE_CHANNEL, null, null);
+
+      // 4. Create local audio track from microphone
+      rtc.localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+      
+      // 5. Publish local audio
+      await rtc.client.publish([rtc.localAudioTrack]);
+
+      rtc.joined = true;
+      
+      // Show/Hide UI elements
+      joinVoiceBtn.classList.add('hidden');
+      voiceControls.classList.remove('hidden');
+      voiceStatusText.classList.remove('hidden');
+
+      // Start initial alone check
+      checkAloneStatus();
+
+      console.log("[Agora] Joined voice lounge successfully!");
+    } catch (err) {
+      console.error("[Agora] Join voice lounge failed:", err);
+      alert("Failed to join voice lounge: " + err.message);
+    }
+  }
+
+  async function leaveVoiceChannel() {
+    if (rtc.aloneTimer) {
+      clearTimeout(rtc.aloneTimer);
+      rtc.aloneTimer = null;
+    }
+
+    if (rtc.localAudioTrack) {
+      rtc.localAudioTrack.close();
+      rtc.localAudioTrack = null;
+    }
+
+    if (rtc.client) {
+      await rtc.client.leave();
+      rtc.client = null;
+    }
+
+    rtc.joined = false;
+    rtc.muted = false;
+
+    // Reset UI elements
+    joinVoiceBtn.classList.remove('hidden');
+    voiceControls.classList.add('hidden');
+    voiceStatusText.classList.add('hidden');
+    muteVoiceBtn.classList.remove('muted-active');
+    muteVoiceBtn.innerHTML = `<i class="fa-solid fa-microphone"></i>`;
+
+    console.log("[Agora] Left voice lounge.");
+  }
+
+  async function toggleMute() {
+    if (!rtc.localAudioTrack) return;
+
+    try {
+      if (rtc.muted) {
+        await rtc.localAudioTrack.setEnabled(true);
+        rtc.muted = false;
+        muteVoiceBtn.classList.remove('muted-active');
+        muteVoiceBtn.innerHTML = `<i class="fa-solid fa-microphone"></i>`;
+      } else {
+        await rtc.localAudioTrack.setEnabled(false);
+        rtc.muted = true;
+        muteVoiceBtn.classList.add('muted-active');
+        muteVoiceBtn.innerHTML = `<i class="fa-solid fa-microphone-slash"></i>`;
+      }
+    } catch (err) {
+      console.error("[Agora] Toggle mute failed:", err);
+    }
+  }
+
+  joinVoiceBtn.addEventListener('click', joinVoiceChannel);
+  leaveVoiceBtn.addEventListener('click', leaveVoiceChannel);
+  muteVoiceBtn.addEventListener('click', toggleMute);
+
+  // Automatically clean up on page close/refresh
+  window.addEventListener('beforeunload', () => {
+    if (rtc.joined) {
+      if (rtc.localAudioTrack) {
+        rtc.localAudioTrack.close();
+      }
+    }
+  });
 });

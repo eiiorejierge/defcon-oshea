@@ -156,6 +156,25 @@
           </div>
           <span id="members-count" class="members-count">0</span>
         </header>
+
+        <!-- Voice Lounge Widget -->
+        <div id="voice-lounge-widget" class="voice-lounge-widget">
+          <button id="join-voice-btn" class="voice-btn join-btn">
+            <i class="fa-solid fa-phone"></i> Join Voice Lounge
+          </button>
+          <div id="voice-controls" class="voice-controls hidden">
+            <button id="mute-voice-btn" class="voice-btn mute-btn" title="Mute Microphone">
+              <i class="fa-solid fa-microphone"></i>
+            </button>
+            <button id="leave-voice-btn" class="voice-btn leave-btn" title="Leave Voice Lounge">
+              <i class="fa-solid fa-phone-slash"></i>
+            </button>
+          </div>
+          <div id="voice-status-text" class="voice-status-text hidden">
+            <span class="pulse-dot-green"></span> Connected to Voice
+          </div>
+        </div>
+
         <div class="users-list-viewport">
           <ul id="users-list">
             <!-- Dynamically populated -->
@@ -222,6 +241,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Agora RTC Client Library -->
+  <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.22.2.js"></script>
 
   <!-- Pusher Client Library -->
   <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
