@@ -1246,9 +1246,14 @@ document.addEventListener('DOMContentLoaded', () => {
       // 3. Join channel with the server-provided credentials
       await rtc.client.join(appId, channel, token, uid);
 
-      // 4. Create local audio track from microphone
-      rtc.localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-      
+      // 4. Create local audio track from microphone (high-quality voice preset)
+      rtc.localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+        encoderConfig: "high_quality", // 48 kHz mono, ~128 Kbps Opus
+        AEC: true, // acoustic echo cancellation
+        ANS: true, // automatic noise suppression
+        AGC: true  // automatic gain control
+      });
+
       // 5. Publish local audio
       await rtc.client.publish([rtc.localAudioTrack]);
 
