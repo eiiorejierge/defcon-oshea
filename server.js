@@ -5,9 +5,10 @@ const Pusher = require('pusher');
 const { RtcTokenBuilder, RtcRole } = require('agora-token');
 
 const isPackaged = typeof process.pkg !== 'undefined';
+const isElectron = typeof process.versions !== 'undefined' && typeof process.versions.electron !== 'undefined';
 
 // Load environment variables from .env file if it exists
-const envPath = isPackaged 
+const envPath = (isPackaged || (isElectron && !process.defaultApp))
   ? path.join(path.dirname(process.execPath), '.env') 
   : path.join(__dirname, '.env');
 if (fs.existsSync(envPath)) {
@@ -50,9 +51,14 @@ const pusher = new Pusher({
 });
 
 
-const DATA_DIR = isPackaged 
-  ? path.join(path.dirname(process.execPath), 'data') 
-  : path.join(__dirname, 'data');
+let DATA_DIR;
+if (isElectron && process.env.ELECTRON_USER_DATA) {
+  DATA_DIR = path.join(process.env.ELECTRON_USER_DATA, 'data');
+} else if (isPackaged) {
+  DATA_DIR = path.join(path.dirname(process.execPath), 'data');
+} else {
+  DATA_DIR = path.join(__dirname, 'data');
+}
 const DATA_FILE = path.join(DATA_DIR, 'messages.json');
 
 // Ensure data directory exists
