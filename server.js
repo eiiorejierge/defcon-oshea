@@ -4,8 +4,12 @@ const fs = require('fs');
 const Pusher = require('pusher');
 const { RtcTokenBuilder, RtcRole } = require('agora-token');
 
+const isPackaged = typeof process.pkg !== 'undefined';
+
 // Load environment variables from .env file if it exists
-const envPath = path.join(__dirname, '.env');
+const envPath = isPackaged 
+  ? path.join(path.dirname(process.execPath), '.env') 
+  : path.join(__dirname, '.env');
 if (fs.existsSync(envPath)) {
   try {
     const lines = fs.readFileSync(envPath, 'utf-8').split(/\r?\n/);
@@ -45,7 +49,10 @@ const pusher = new Pusher({
   useTLS: true
 });
 
-const DATA_DIR = path.join(__dirname, 'data');
+
+const DATA_DIR = isPackaged 
+  ? path.join(path.dirname(process.execPath), 'data') 
+  : path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'messages.json');
 
 // Ensure data directory exists
