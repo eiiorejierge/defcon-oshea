@@ -399,6 +399,54 @@ document.addEventListener('DOMContentLoaded', () => {
     return date.toLocaleString();
   }
 
+  // Helper to convert URLs, Giphy links, and direct images into Discord-style embeds
+  function formatMessageContent(text) {
+    // 1. Escape HTML to prevent XSS
+    const div = document.createElement('div');
+    div.textContent = text;
+    let escapedText = div.innerHTML;
+
+    // Regex to match URLs
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    
+    // Find all matches
+    const urls = text.match(urlRegex) || [];
+    let embedsHtml = '';
+    
+    // Replace links in the text with anchors
+    escapedText = escapedText.replace(urlRegex, (url) => {
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-link">${url}</a>`;
+    });
+
+    // Generate embeds for each URL
+    urls.forEach(url => {
+      // 1. Check if it's a direct image link
+      const isDirectImage = /\.(jpeg|jpg|gif|png|webp)(?:\?.*)?$/i.test(url);
+      
+      // 2. Check if it's a Giphy link
+      const giphyRegex = /https?:\/\/(?:media\d*\.giphy\.com\/media\/([a-zA-Z0-9]+)\/giphy\.gif|giphy\.com\/gifs\/(?:[a-zA-Z0-9-]+-)?([a-zA-Z0-9]+))/i;
+      const giphyMatch = url.match(giphyRegex);
+
+      if (isDirectImage) {
+        embedsHtml += `
+          <div class="chat-embed-image">
+            <img src="${url}" alt="Shared Image" loading="lazy" />
+          </div>
+        `;
+      } else if (giphyMatch) {
+        const giphyId = giphyMatch[1] || giphyMatch[2];
+        const directGiphyUrl = `https://media.giphy.com/media/${giphyId}/giphy.gif`;
+        embedsHtml += `
+          <div class="chat-embed-image">
+            <img src="${directGiphyUrl}" alt="Giphy GIF" loading="lazy" />
+          </div>
+        `;
+      }
+    });
+
+    return `<span class="message-text">${escapedText}</span>` + embedsHtml;
+  }
+
   // Helper to create and return a message element securely
   function createMessageElement(msg, isSelf, isArchive = false) {
     // Action messages (/me, dice rolls, etc.) render as a centered emote line
@@ -445,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Message content block
     const contentDiv = document.createElement('div');
     contentDiv.classList.add('message-content');
-    contentDiv.textContent = msg.text;
+    contentDiv.innerHTML = formatMessageContent(msg.text);
 
     messageDiv.appendChild(metaDiv);
     messageDiv.appendChild(contentDiv);
@@ -1318,17 +1366,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- Agora Voice Call Integration (Super Barebones) ---
-  // These are only fallbacks — the server returns the authoritative App ID and
-  // channel alongside each token so the two can never drift out of sync.
+  // --- Agora Voice Call & Streaming Integration ---
   const AGORA_APP_ID = "9f05b55c788b47f3a11622bd8ac945ad";
   const VOICE_CHANNEL = "lounge-voice";
 
   let rtc = {
     client: null,
     localAudioTrack: null,
+    localVideoTrack: null, // Screen share track
     joined: false,
     muted: false,
+    sharingScreen: false,
     aloneTimer: null
   };
 
@@ -1337,6 +1385,50 @@ document.addEventListener('DOMContentLoaded', () => {
   const muteVoiceBtn = document.getElementById('mute-voice-btn');
   const leaveVoiceBtn = document.getElementById('leave-voice-btn');
   const voiceStatusText = document.getElementById('voice-status-text');
+
+  // Screen Share elements
+  const screenShareViewport = document.getElementById('screen-share-viewport');
+  const screenShareLabel = document.getElementById('screen-share-label');
+  const screenSharePlayer = document.getElementById('screen-share-player');
+  const closeScreenBtn = document.getElementById('close-screen-btn');
+  const shareScreenBtn = document.getElementById('share-screen-btn');
+
+  function showLocalScreenShare() {
+    if (!screenShareViewport) return;
+    screenShareViewport.classList.remove('hidden');
+    screenShareLabel.textContent = "You are sharing your screen";
+    screenSharePlayer.innerHTML = "";
+    if (rtc.localVideoTrack) {
+      rtc.localVideoTrack.play('screen-share-player');
+    }
+  }
+
+  function hideLocalScreenShare() {
+    if (rtc.localVideoTrack) {
+      rtc.localVideoTrack.stop();
+    }
+    if (screenShareViewport) {
+      screenShareViewport.classList.add('hidden');
+      screenSharePlayer.innerHTML = "";
+    }
+  }
+
+  function showRemoteScreenShare(user) {
+    if (!screenShareViewport) return;
+    screenShareViewport.classList.remove('hidden');
+    screenShareLabel.textContent = `${user.uid || 'Someone'} is sharing their screen`;
+    screenSharePlayer.innerHTML = "";
+    if (user.videoTrack) {
+      user.videoTrack.play('screen-share-player');
+    }
+  }
+
+  function hideRemoteScreenShare(user) {
+    if (screenShareViewport) {
+      screenShareViewport.classList.add('hidden');
+      screenSharePlayer.innerHTML = "";
+    }
+  }
 
   // Check if we are the only one in the channel
   function checkAloneStatus() {
@@ -1396,15 +1488,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mediaType === "audio") {
           user.audioTrack.play();
         }
+        if (mediaType === "video") {
+          showRemoteScreenShare(user);
+        }
         // Check alone status whenever remote user count changes
         checkAloneStatus();
       });
 
-      rtc.client.on("user-unpublished", (user) => {
+      rtc.client.on("user-unpublished", (user, mediaType) => {
+        if (mediaType === "video") {
+          hideRemoteScreenShare(user);
+        }
         checkAloneStatus();
       });
 
       rtc.client.on("user-left", (user) => {
+        hideRemoteScreenShare(user);
         checkAloneStatus();
       });
 
@@ -1412,14 +1511,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const tokenRes = await fetch('/api/voice-token');
       const tokenData = await tokenRes.json().catch(() => ({}));
       if (!tokenRes.ok || !tokenData.success || !tokenData.token) {
-        // Surface the real server-side reason instead of a generic message
-        // (e.g. "Agora credentials are not configured on the server.")
         throw new Error(tokenData.error || `Failed to retrieve voice access token (HTTP ${tokenRes.status}).`);
       }
       const token = tokenData.token;
 
-      // The server is the single source of truth for these — using its values
-      // guarantees the join matches exactly what the token was signed for.
+      // The server is the single source of truth for these
       const appId = tokenData.appId || AGORA_APP_ID;
       const channel = tokenData.channel || VOICE_CHANNEL;
       const uid = (tokenData.uid !== undefined && tokenData.uid !== null) ? tokenData.uid : 0;
@@ -1466,6 +1562,17 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTimeout(rtc.aloneTimer);
       rtc.aloneTimer = null;
     }
+
+    if (rtc.localVideoTrack) {
+      rtc.localVideoTrack.close();
+      rtc.localVideoTrack = null;
+    }
+    rtc.sharingScreen = false;
+    if (shareScreenBtn) {
+      shareScreenBtn.classList.remove('share-active');
+      shareScreenBtn.innerHTML = `<i class="fa-solid fa-desktop"></i>`;
+    }
+    hideLocalScreenShare();
 
     if (rtc.localAudioTrack) {
       rtc.localAudioTrack.close();
@@ -1516,9 +1623,57 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function toggleScreenShare() {
+    if (!rtc.joined || !rtc.client) return;
+
+    try {
+      if (rtc.sharingScreen) {
+        if (rtc.localVideoTrack) {
+          await rtc.client.unpublish([rtc.localVideoTrack]);
+          rtc.localVideoTrack.close();
+          rtc.localVideoTrack = null;
+        }
+        rtc.sharingScreen = false;
+        shareScreenBtn.classList.remove('share-active');
+        shareScreenBtn.innerHTML = `<i class="fa-solid fa-desktop"></i>`;
+        hideLocalScreenShare();
+      } else {
+        rtc.localVideoTrack = await AgoraRTC.createScreenVideoTrack({
+          encoderConfig: "1080p_1", // 1080p 15fps, detail optimized
+          optimizationMode: "detail"
+        }, "auto");
+
+        rtc.localVideoTrack.on("track-ended", () => {
+          if (rtc.sharingScreen) {
+            toggleScreenShare();
+          }
+        });
+
+        await rtc.client.publish([rtc.localVideoTrack]);
+        rtc.sharingScreen = true;
+        shareScreenBtn.classList.add('share-active');
+        shareScreenBtn.innerHTML = `<i class="fa-solid fa-desktop-slash"></i>`;
+        showLocalScreenShare();
+      }
+    } catch (err) {
+      console.error("[Agora] Screen sharing failed:", err);
+      alert("Failed to share screen: " + err.message);
+    }
+  }
+
   joinVoiceBtn.addEventListener('click', joinVoiceChannel);
   leaveVoiceBtn.addEventListener('click', leaveVoiceChannel);
   muteVoiceBtn.addEventListener('click', toggleMute);
+  if (shareScreenBtn) shareScreenBtn.addEventListener('click', toggleScreenShare);
+  if (closeScreenBtn) {
+    closeScreenBtn.addEventListener('click', () => {
+      if (rtc.sharingScreen) {
+        toggleScreenShare();
+      } else {
+        if (screenShareViewport) screenShareViewport.classList.add('hidden');
+      }
+    });
+  }
 
   // Automatically clean up on page close/refresh
   window.addEventListener('beforeunload', () => {
@@ -1526,7 +1681,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (rtc.localAudioTrack) {
         rtc.localAudioTrack.close();
       }
-      // Best-effort notify others we left the voice roster
+      if (rtc.localVideoTrack) {
+        rtc.localVideoTrack.close();
+      }
       try {
         const blob = new Blob(
           [JSON.stringify({ username: currentUsername, inVoice: false })],

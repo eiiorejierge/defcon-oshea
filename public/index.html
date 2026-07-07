@@ -123,6 +123,17 @@
 
         <!-- Messages View -->
         <div id="chat-body">
+          <!-- Screen Share Viewport -->
+          <div id="screen-share-viewport" class="hidden">
+            <div class="video-window-header">
+              <span id="screen-share-label">Someone is sharing screen...</span>
+              <button id="close-screen-btn" class="icon-btn" title="Stop/Close Screen Share">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div id="screen-share-player"></div>
+          </div>
+
           <!-- Live Messages Container -->
           <div id="messages-container" class="messages-viewport active-view">
             <div class="system-message">
@@ -168,6 +179,9 @@
           <div id="voice-controls" class="voice-controls hidden">
             <button id="mute-voice-btn" class="voice-btn mute-btn" title="Mute Microphone">
               <i class="fa-solid fa-microphone"></i>
+            </button>
+            <button id="share-screen-btn" class="voice-btn share-btn" title="Share Screen">
+              <i class="fa-solid fa-desktop"></i>
             </button>
             <button id="leave-voice-btn" class="voice-btn leave-btn" title="Leave Voice Lounge">
               <i class="fa-solid fa-phone-slash"></i>
