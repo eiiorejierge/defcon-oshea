@@ -618,6 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
           
           // Render the messages using dynamic filter/render logic
           renderArchive();
+          renderVoiceRoster();
 
           // Switch to the archive view tab immediately
           switchTab('archive');
@@ -855,8 +856,8 @@ document.addEventListener('DOMContentLoaded', () => {
         li.appendChild(watchBtn);
       }
 
-      // Kick button for remote users in voice call
-      if (!isSelf) {
+      // Kick button for remote users in voice call (only shown if admin authenticated)
+      if (!isSelf && isAdminAuthenticated) {
         const kickBtn = document.createElement('button');
         kickBtn.className = 'kick-member-btn';
         kickBtn.innerHTML = `<i class="fa-solid fa-user-slash"></i>`;
@@ -879,7 +880,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetch('/api/voice-kick', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetUsername, kickedBy: currentUsername })
+      body: JSON.stringify({ targetUsername, kickedBy: currentUsername, adminCode: currentAdminCode })
     }).catch(err => console.error('Error sending kick request:', err));
   }
 

@@ -205,7 +205,10 @@ app.post('/api/voice-presence', (req, res) => {
 
 // Endpoint to kick a user from the voice call
 app.post('/api/voice-kick', (req, res) => {
-  const { targetUsername, kickedBy } = req.body;
+  const { targetUsername, kickedBy, adminCode } = req.body;
+  if (adminCode !== ADMIN_CODE) {
+    return res.status(401).json({ success: false, error: 'Unauthorized. Admin credentials required.' });
+  }
   if (!targetUsername) {
     return res.status(400).json({ error: 'Target username is required.' });
   }
