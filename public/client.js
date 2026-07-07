@@ -64,6 +64,15 @@ document.addEventListener('DOMContentLoaded', () => {
       // Initialize Pusher connection
       initPusher();
       
+      // Notify server of join event
+      fetch('/api/join', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username })
+      }).catch(err => console.error('Error notifying join event:', err));
+      
       // UI transition
       onboardingScreen.classList.add('hidden');
       chatScreen.classList.remove('hidden');

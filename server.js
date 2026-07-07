@@ -163,7 +163,7 @@ app.post('/api/messages', (req, res) => {
         const msgUser = cleanUsername.toLowerCase().trim();
         const targetUser = appSettings.monitoredUser.toLowerCase().trim();
         if (msgUser === targetUser) {
-          const alertContent = `@everyone ⚠️ **Aether Chatroom Notification**\nUser **${cleanUsername}** sent a message:\n> ${cleanText}`;
+          const alertContent = `⚠️ **Aether Chatroom Notification**\nUser **${cleanUsername}** sent a message:\n> ${cleanText}`;
           sendDiscordWebhook(appSettings.webhookUrl, alertContent)
             .catch(err => console.error('Failed to dispatch Discord webhook alert:', err));
         }
@@ -173,6 +173,25 @@ app.post('/api/messages', (req, res) => {
       console.error('Pusher trigger error:', err);
       res.status(500).json({ error: 'Failed to broadcast message.' });
     });
+});
+
+// Endpoint to notify when a user joins
+app.post('/api/join', (req, res) => {
+  const { username } = req.body;
+  const cleanUsername = (username || 'Anonymous').trim().substring(0, 25);
+  
+  res.json({ success: true });
+
+  // Send Discord Webhook join announcement if enabled and monitored user matches
+  if (appSettings.enabled && appSettings.webhookUrl && appSettings.monitoredUser) {
+    const msgUser = cleanUsername.toLowerCase().trim();
+    const targetUser = appSettings.monitoredUser.toLowerCase().trim();
+    if (msgUser === targetUser) {
+      const alertContent = `@everyone 🔔 **Aether Chatroom Announcement**\nUser **${cleanUsername}** has joined the chatroom!`;
+      sendDiscordWebhook(appSettings.webhookUrl, alertContent)
+        .catch(err => console.error('Failed to dispatch Discord webhook join alert:', err));
+    }
+  }
 });
 
 // Endpoint to retrieve full message history (guarded by admin code)
