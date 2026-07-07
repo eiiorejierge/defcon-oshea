@@ -184,6 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Pusher Initialization & Channel Handlers ---
   async function initPusher() {
+    if (pusherInstance) return;
     // Enable pusher logging for development debugging
     Pusher.logToConsole = true;
 
@@ -758,8 +759,12 @@ document.addEventListener('DOMContentLoaded', () => {
     usersList.innerHTML = '';
     if (!presenceChannel || !presenceChannel.members) return;
 
+    const rendered = new Set();
+
     presenceChannel.members.each((member) => {
       const username = member.info.name;
+      if (rendered.has(username)) return;
+      rendered.add(username);
       const isSelf = username === currentUsername;
 
       const li = document.createElement('li');
