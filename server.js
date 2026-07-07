@@ -52,6 +52,50 @@ function saveMessage(msg) {
   }
 }
 
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+let appSettings = {
+  webhookUrl: '',
+  monitoredUser: '',
+  enabled: false
+};
+
+try {
+  if (fs.existsSync(SETTINGS_FILE)) {
+    const settingsContent = fs.readFileSync(SETTINGS_FILE, 'utf-8');
+    appSettings = JSON.parse(settingsContent);
+    console.log('Loaded application settings successfully.');
+  }
+} catch (error) {
+  console.error('Failed to load application settings:', error);
+}
+
+function saveSettings(settings) {
+  appSettings = {
+    webhookUrl: settings.webhookUrl || '',
+    monitoredUser: settings.monitoredUser || '',
+    enabled: !!settings.enabled
+  };
+  try {
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(appSettings, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('Failed to write settings to file:', error);
+  }
+}
+
+async function sendDiscordWebhook(url, content) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ content })
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Discord Webhook API returned ${response.status}: ${errText}`);
+  }
+}
+
 // Endpoint to retrieve Pusher configuration dynamically for the client
 app.get('/api/config', (req, res) => {
   res.json({
@@ -113,6 +157,17 @@ app.post('/api/messages', (req, res) => {
   pusher.trigger('presence-chat', 'new-message', message)
     .then(() => {
       res.json({ success: true, message });
+
+      // Send Discord Webhook notification if enabled and monitored user matches
+      if (appSettings.enabled && appSettings.webhookUrl && appSettings.monitoredUser) {
+        const msgUser = cleanUsername.toLowerCase().trim();
+        const targetUser = appSettings.monitoredUser.toLowerCase().trim();
+        if (msgUser === targetUser) {
+          const alertContent = `⚠️ **Aether Chatroom Notification**\nUser **${cleanUsername}** sent a message:\n> ${cleanText}`;
+          sendDiscordWebhook(appSettings.webhookUrl, alertContent)
+            .catch(err => console.error('Failed to dispatch Discord webhook alert:', err));
+        }
+      }
     })
     .catch((err) => {
       console.error('Pusher trigger error:', err);
@@ -126,6 +181,47 @@ app.post('/api/history', (req, res) => {
 
   if (adminCode === ADMIN_CODE) {
     res.json({ success: true, messages: messageHistory });
+  } else {
+    res.status(401).json({ success: false, error: 'Invalid admin passcode. Access denied.' });
+  }
+});
+
+// Endpoint to retrieve current settings (guarded by admin code)
+app.post('/api/settings/get', (req, res) => {
+  const { adminCode } = req.body;
+  if (adminCode === ADMIN_CODE) {
+    res.json({ success: true, settings: appSettings });
+  } else {
+    res.status(401).json({ success: false, error: 'Invalid admin passcode. Access denied.' });
+  }
+});
+
+// Endpoint to save settings (guarded by admin code)
+app.post('/api/settings/save', (req, res) => {
+  const { adminCode, settings } = req.body;
+  if (adminCode === ADMIN_CODE) {
+    saveSettings(settings);
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ success: false, error: 'Invalid admin passcode. Access denied.' });
+  }
+});
+
+// Endpoint to test webhook URL (guarded by admin code)
+app.post('/api/settings/test', (req, res) => {
+  const { adminCode, webhookUrl } = req.body;
+  if (adminCode === ADMIN_CODE) {
+    if (!webhookUrl) {
+      return res.status(400).json({ success: false, error: 'Webhook URL is required.' });
+    }
+    sendDiscordWebhook(webhookUrl, "🔔 **Aether Chat**: This is a test notification. Your Discord Webhook integration is working successfully!")
+      .then(() => {
+        res.json({ success: true });
+      })
+      .catch(err => {
+        console.error('Webhook test failed:', err);
+        res.status(500).json({ success: false, error: err.message });
+      });
   } else {
     res.status(401).json({ success: false, error: 'Invalid admin passcode. Access denied.' });
   }

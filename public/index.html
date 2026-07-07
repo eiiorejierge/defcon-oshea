@@ -83,6 +83,10 @@
           <i class="fa-solid fa-box-archive"></i>
           Server Archive
         </button>
+        <button id="tab-settings" class="tab-btn">
+          <i class="fa-solid fa-gear"></i>
+          Settings
+        </button>
       </div>
 
       <!-- Admin Controls Container (Visible when in Archive View) -->
@@ -114,6 +118,45 @@
           <div class="system-message">
             <span class="sys-text"><i class="fa-solid fa-shield-halved"></i> Server history view. All past messages since server start are listed here.</span>
           </div>
+        </div>
+
+        <!-- Settings Container (Hidden by default) -->
+        <div id="settings-container" class="messages-viewport hidden-view">
+          <div class="system-message">
+            <span class="sys-text"><i class="fa-solid fa-gear"></i> Discord Webhook Integration Settings</span>
+          </div>
+          
+          <form id="settings-form" class="settings-layout">
+            <div class="settings-group">
+              <label for="webhook-url-input">Discord Webhook URL</label>
+              <input type="url" id="webhook-url-input" placeholder="https://discord.com/api/webhooks/..." autocomplete="off">
+            </div>
+
+            <div class="settings-group">
+              <label for="monitor-user-input">Monitored User (Username)</label>
+              <input type="text" id="monitor-user-input" placeholder="e.g., StarGazer" autocomplete="off" maxlength="25">
+              <p class="settings-hint">Trigger webhook notification when this specific user sends a message.</p>
+            </div>
+
+            <div class="settings-group toggle-group">
+              <label class="toggle-container">
+                <input type="checkbox" id="webhook-enabled-checkbox">
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">Enable Discord Webhook Alerts</span>
+              </label>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 10px;">
+              <button type="submit" id="save-settings-btn" class="action-btn" style="flex: 1; justify-content: center; height: 42px;">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span>Save Settings</span>
+              </button>
+              <button type="button" id="test-webhook-btn" class="action-btn" style="flex: 1; justify-content: center; height: 42px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); box-shadow: none;">
+                <i class="fa-solid fa-paper-plane"></i>
+                <span>Test Webhook</span>
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
