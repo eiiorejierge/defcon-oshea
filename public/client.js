@@ -1738,7 +1738,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hideLocalScreenShare();
       } else {
         const screenTrack = await AgoraRTC.createScreenVideoTrack({
-          encoderConfig: "1080p_1", // 1080p 15fps, detail optimized
+          encoderConfig: "1080p_2", // 1080p 30fps, smooth frame rate
           optimizationMode: "detail"
         }, "auto");
 
