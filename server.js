@@ -2,6 +2,30 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const Pusher = require('pusher');
+const { RtcTokenBuilder, RtcRole } = require('agora-token');
+
+// Load environment variables from .env file if it exists
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  try {
+    const lines = fs.readFileSync(envPath, 'utf-8').split(/\r?\n/);
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) return;
+      const match = trimmed.match(/^([\w.-]+)\s*=\s*(.*)?$/);
+      if (match) {
+        const key = match[1];
+        let val = match[2] || '';
+        if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+        else if (val.startsWith("'") && val.endsWith("'")) val = val.slice(1, -1);
+        process.env[key] = val.trim();
+      }
+    });
+    console.log('Loaded environment variables from local .env file.');
+  } catch (err) {
+    console.error('Failed to parse local .env file:', err);
+  }
+}
 
 const app = express();
 
@@ -98,6 +122,38 @@ app.get('/api/config', (req, res) => {
     key: process.env.PUSHER_KEY || '8cc1a38474623bd4a70e',
     cluster: process.env.PUSHER_CLUSTER || 'us3'
   });
+});
+
+// Endpoint to generate Agora RTC voice tokens dynamically
+app.get('/api/voice-token', (req, res) => {
+  const appId = process.env.AGORA_APP_ID;
+  const appCertificate = process.env.AGORA_APP_CERTIFICATE;
+
+  if (!appId || !appCertificate) {
+    return res.status(500).json({ error: 'Agora credentials are not configured on the server.' });
+  }
+
+  const channelName = "lounge-voice";
+  const uid = 0; // Dynamic UID
+  const role = RtcRole.PUBLISHER;
+  const expirationTimeInSeconds = 3600; // 1 hour token validity
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+  try {
+    const token = RtcTokenBuilder.buildTokenWithUid(
+      appId,
+      appCertificate,
+      channelName,
+      uid,
+      role,
+      privilegeExpiredTs
+    );
+    res.json({ success: true, token });
+  } catch (err) {
+    console.error('Agora token generation error:', err);
+    res.status(500).json({ error: 'Failed to generate token.' });
+  }
 });
 
 // Serve public directory

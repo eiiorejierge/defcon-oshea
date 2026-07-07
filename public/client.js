@@ -1225,8 +1225,19 @@ document.addEventListener('DOMContentLoaded', () => {
         checkAloneStatus();
       });
 
-      // 3. Join channel
-      await rtc.client.join(AGORA_APP_ID, VOICE_CHANNEL, null, null);
+      // Fetch dynamic token from server
+      const tokenRes = await fetch('/api/voice-token');
+      if (!tokenRes.ok) {
+        throw new Error('Failed to retrieve voice access token.');
+      }
+      const tokenData = await tokenRes.json();
+      if (!tokenData.success || !tokenData.token) {
+        throw new Error(tokenData.error || 'Invalid voice token received.');
+      }
+      const token = tokenData.token;
+
+      // 3. Join channel (with dynamic token and uid = 0)
+      await rtc.client.join(AGORA_APP_ID, VOICE_CHANNEL, token, 0);
 
       // 4. Create local audio track from microphone
       rtc.localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
