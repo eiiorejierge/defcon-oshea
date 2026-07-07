@@ -91,6 +91,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeSettingsModalBtn = document.getElementById('close-settings-modal-btn');
   const soundToggle = document.getElementById('sound-toggle');
 
+  // DOM Elements - Changelog
+  const changelogBtn = document.getElementById('changelog-btn');
+  const changelogModal = document.getElementById('changelog-modal');
+  const closeChangelogModalBtn = document.getElementById('close-changelog-modal-btn');
+
   // Lazily-created audio context for notification sounds (browsers require a
   // user gesture before audio can play, hence the lazy resume-on-demand).
   let audioCtx = null;
@@ -1163,6 +1168,31 @@ document.addEventListener('DOMContentLoaded', () => {
     settingsModal.addEventListener('click', (e) => {
       if (e.target === settingsModal) {
         settingsModal.classList.add('hidden');
+        focusElement(messageInput);
+      }
+    });
+  }
+
+  // =====================================================================
+  //  Changelog
+  // =====================================================================
+  if (changelogBtn && changelogModal) {
+    changelogBtn.addEventListener('click', () => {
+      changelogModal.classList.remove('hidden');
+    });
+  }
+
+  if (closeChangelogModalBtn && changelogModal) {
+    closeChangelogModalBtn.addEventListener('click', () => {
+      changelogModal.classList.add('hidden');
+      focusElement(messageInput);
+    });
+  }
+
+  if (changelogModal) {
+    changelogModal.addEventListener('click', (e) => {
+      if (e.target === changelogModal) {
+        changelogModal.classList.add('hidden');
         focusElement(messageInput);
       }
     });

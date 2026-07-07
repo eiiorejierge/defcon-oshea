@@ -92,6 +92,9 @@
           </div>
 
           <div class="chat-header-actions">
+            <button id="changelog-btn" class="icon-btn" title="Changelog">
+              <i class="fa-solid fa-clipboard-list"></i>
+            </button>
             <button id="settings-btn" class="icon-btn" title="Settings">
               <i class="fa-solid fa-gear"></i>
             </button>
@@ -314,6 +317,40 @@
             <input type="checkbox" id="sound-toggle">
             <span class="switch-slider"></span>
           </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Changelog Modal -->
+  <div id="changelog-modal" class="modal-overlay hidden">
+    <div class="modal-content glass-card scale-up">
+      <header class="modal-header">
+        <div class="admin-icon-container">
+          <i class="fa-solid fa-clipboard-list"></i>
+        </div>
+        <h3>Changelog</h3>
+        <button id="close-changelog-modal-btn" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+      </header>
+      <div class="modal-body changelog-body">
+        <div class="changelog-version">
+          <h4>Version 1.2.0 (July 2026)</h4>
+          <ul class="changelog-list">
+            <li><span class="changelog-tag tag-new">NEW</span> <strong>Giphy GIF Search & Picker:</strong> Added a built-in GIF search button inside the chat input. Click to open trending GIFs, search Giphy in real time, and click to send.</li>
+            <li><span class="changelog-tag tag-new">NEW</span> <strong>30 FPS Screen Sharing:</strong> Increased screen sharing frame rate from 5fps to 30fps for ultra-smooth video streaming in the Voice Lounge.</li>
+            <li><span class="changelog-tag tag-update">IMPROVED</span> <strong>Side-by-Side Split View:</strong> Relocated the stream presentation viewport to dock side-by-side with the chat screen (the chat remains 100% visible and interactive while watching).</li>
+            <li><span class="changelog-tag tag-new">NEW</span> <strong>Theatre Mode & Fullscreen:</strong> Added expand buttons to collapse the chat and view the stream in focus layout, or use native fullscreen.</li>
+            <li><span class="changelog-tag tag-new">NEW</span> <strong>Watch Roster Controls:</strong> Streams no longer auto-launch; instead, click the "Watch" button next to a streamer's name in the voice lounge roster list.</li>
+            <li><span class="changelog-tag tag-fix">FIX</span> <strong>Stale User Count:</strong> Switched Pusher authorization identifiers to username mapping and added explicit socket disconnection on tab close to resolve ghost/duplicate user listings.</li>
+          </ul>
+        </div>
+        <div class="changelog-version">
+          <h4>Version 1.1.0</h4>
+          <ul class="changelog-list">
+            <li><span class="changelog-tag tag-new">NEW</span> <strong>Agora Voice Lounge:</strong> Join voice lounge calls in Aether lounge channels directly.</li>
+            <li><span class="changelog-tag tag-new">NEW</span> <strong>Discord Webhooks:</strong> Configure server-side alerts to announce user joins on external Discord channels.</li>
+            <li><span class="changelog-tag tag-update">IMPROVED</span> <strong>Glassmorphic Dark Interface:</strong> Reworked typography, smooth transitions, and glass backdrops.</li>
+          </ul>
         </div>
       </div>
     </div>
