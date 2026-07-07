@@ -1693,4 +1693,86 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (e) { /* ignore */ }
     }
   });
+
+  // --- Giphy GIF Search & Picker Integration ---
+  const GIPHY_API_KEY = "dc6zaTOxFJmzC";
+  let gifSearchTimeout = null;
+
+  const gifToggleBtn = document.getElementById('gif-toggle-btn');
+  const gifPickerPanel = document.getElementById('gif-picker-panel');
+  const gifSearchInput = document.getElementById('gif-search-input');
+  const gifResultsContainer = document.getElementById('gif-results-container');
+
+  async function fetchGifs(query = '') {
+    if (!gifResultsContainer) return;
+    
+    gifResultsContainer.innerHTML = '<div class="gif-loading">Loading...</div>';
+
+    try {
+      let url;
+      if (query) {
+        url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=20`;
+      } else {
+        url = `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=20`;
+      }
+
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      gifResultsContainer.innerHTML = '';
+      if (data.data && data.data.length > 0) {
+        data.data.forEach(gif => {
+          const imgUrl = gif.images.fixed_height.url;
+          const shareUrl = gif.url;
+
+          const img = document.createElement('img');
+          img.src = gif.images.fixed_height_downsampled.url || imgUrl;
+          img.alt = gif.title || 'GIF';
+          img.title = 'Click to send';
+          img.loading = 'lazy';
+          img.addEventListener('click', () => {
+            sendChatMessage(shareUrl);
+            if (gifPickerPanel) gifPickerPanel.classList.add('hidden');
+          });
+          gifResultsContainer.appendChild(img);
+        });
+      } else {
+        gifResultsContainer.innerHTML = '<div class="gif-loading">No results found.</div>';
+      }
+    } catch (err) {
+      console.error('Error fetching GIFs:', err);
+      gifResultsContainer.innerHTML = '<div class="gif-loading">Failed to load GIFs.</div>';
+    }
+  }
+
+  if (gifToggleBtn && gifPickerPanel) {
+    gifToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = gifPickerPanel.classList.toggle('hidden');
+      if (!isHidden) {
+        fetchGifs();
+        if (gifSearchInput) {
+          setTimeout(() => gifSearchInput.focus(), 50);
+        }
+      }
+    });
+
+    // Close panel when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!gifPickerPanel.classList.contains('hidden')) {
+        if (!gifPickerPanel.contains(e.target) && e.target !== gifToggleBtn && !gifToggleBtn.contains(e.target)) {
+          gifPickerPanel.classList.add('hidden');
+        }
+      }
+    });
+  }
+
+  if (gifSearchInput) {
+    gifSearchInput.addEventListener('input', () => {
+      clearTimeout(gifSearchTimeout);
+      gifSearchTimeout = setTimeout(() => {
+        fetchGifs(gifSearchInput.value.trim());
+      }, 500); // debounce searches by 500ms
+    });
+  }
 });

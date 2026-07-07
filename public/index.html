@@ -152,8 +152,25 @@
         <!-- Footer / Input Bar -->
         <footer id="chat-footer">
           <div id="command-hints" class="hidden"></div>
+
+          <!-- GIF Picker Panel -->
+          <div id="gif-picker-panel" class="glass-card hidden">
+            <div class="gif-picker-header">
+              <i class="fa-solid fa-magnifying-glass search-icon"></i>
+              <input type="text" id="gif-search-input" placeholder="Search GIPHY..." autocomplete="off">
+            </div>
+            <div id="gif-results-container" class="gif-results-grid">
+              <!-- Dynamically populated GIFs -->
+            </div>
+          </div>
+
           <form id="message-form">
-            <input type="text" id="message-input" placeholder="Type a message…  (try /help)" maxlength="1000" required autocomplete="off">
+            <div class="input-container-wrapper">
+              <input type="text" id="message-input" placeholder="Type a message…  (try /help)" maxlength="1000" required autocomplete="off">
+              <button type="button" id="gif-toggle-btn" class="input-action-btn" title="Choose a GIF">
+                <i class="fa-solid fa-image"></i>
+              </button>
+            </div>
             <button type="submit" id="send-message-btn" class="primary-btn-circle" title="Send Message">
               <i class="fa-solid fa-paper-plane"></i>
             </button>
