@@ -38,15 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const clearFilterBtn = document.getElementById('clear-filter-btn');
   const saveChatsBtn = document.getElementById('save-chats-btn');
 
-  // DOM Elements - Settings
-  const tabSettings = document.getElementById('tab-settings');
-  const settingsContainer = document.getElementById('settings-container');
-  const settingsForm = document.getElementById('settings-form');
-  const webhookUrlInput = document.getElementById('webhook-url-input');
-  const monitorUserInput = document.getElementById('monitor-user-input');
-  const webhookEnabledCheckbox = document.getElementById('webhook-enabled-checkbox');
-  const testWebhookBtn = document.getElementById('test-webhook-btn');
-
   // DOM Elements - Active Users & Header
   const headerUsername = document.getElementById('header-username');
   const usersToggleBtn = document.getElementById('users-toggle-btn');
@@ -396,9 +387,6 @@ document.addEventListener('DOMContentLoaded', () => {
           // Render the messages using dynamic filter/render logic
           renderArchive();
 
-          // Fetch Webhook settings from server
-          loadSettings(adminCode);
-
           // Switch to the archive view tab immediately
           switchTab('archive');
         } else {
@@ -415,26 +403,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   });
-
-  // Load webhook settings helper
-  function loadSettings(adminCode) {
-    fetch('/api/settings/get', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ adminCode })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success && data.settings) {
-        webhookUrlInput.value = data.settings.webhookUrl || '';
-        monitorUserInput.value = data.settings.monitoredUser || '';
-        webhookEnabledCheckbox.checked = !!data.settings.enabled;
-      }
-    })
-    .catch(err => console.error('Error loading settings from server:', err));
-  }
 
   // Render function for Archive with filtering
   function renderArchive() {
@@ -478,15 +446,12 @@ document.addEventListener('DOMContentLoaded', () => {
       activeTab = 'live';
       tabLive.classList.add('active');
       tabArchive.classList.remove('active');
-      tabSettings.classList.remove('active');
       
       messagesContainer.classList.remove('hidden-view');
       messagesContainer.classList.add('active-view');
       
       archiveContainer.classList.remove('active-view');
       archiveContainer.classList.add('hidden-view');
-      settingsContainer.classList.remove('active-view');
-      settingsContainer.classList.add('hidden-view');
       
       // Hide admin controls in live view
       adminControls.classList.add('hidden');
@@ -496,15 +461,12 @@ document.addEventListener('DOMContentLoaded', () => {
       activeTab = 'archive';
       tabArchive.classList.add('active');
       tabLive.classList.remove('active');
-      tabSettings.classList.remove('active');
       
       archiveContainer.classList.remove('hidden-view');
       archiveContainer.classList.add('active-view');
       
       messagesContainer.classList.remove('active-view');
       messagesContainer.classList.add('hidden-view');
-      settingsContainer.classList.remove('active-view');
-      settingsContainer.classList.add('hidden-view');
       
       // Show admin controls in archive view if authenticated
       if (isAdminAuthenticated) {
@@ -512,28 +474,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       archiveContainer.scrollTop = archiveContainer.scrollHeight;
-    } else if (target === 'settings') {
-      activeTab = 'settings';
-      tabSettings.classList.add('active');
-      tabLive.classList.remove('active');
-      tabArchive.classList.remove('active');
-      
-      settingsContainer.classList.remove('hidden-view');
-      settingsContainer.classList.add('active-view');
-      
-      messagesContainer.classList.remove('active-view');
-      messagesContainer.classList.add('hidden-view');
-      archiveContainer.classList.remove('active-view');
-      archiveContainer.classList.add('hidden-view');
-      
-      // Hide admin controls in settings view
-      adminControls.classList.add('hidden');
     }
   }
 
   tabLive.addEventListener('click', () => switchTab('live'));
   tabArchive.addEventListener('click', () => switchTab('archive'));
-  tabSettings.addEventListener('click', () => switchTab('settings'));
 
   // --- Search Filter Inputs & Save Events ---
   filterUserInput.addEventListener('input', () => {
@@ -578,77 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
     URL.revokeObjectURL(url);
   });
 
-  // Save Settings Submit Action
-  settingsForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (!isAdminAuthenticated || !currentAdminCode) return;
 
-    const webhookUrl = webhookUrlInput.value.trim();
-    const monitoredUser = monitorUserInput.value.trim();
-    const enabled = webhookEnabledCheckbox.checked;
-
-    const settings = { webhookUrl, monitoredUser, enabled };
-
-    fetch('/api/settings/save', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ adminCode: currentAdminCode, settings })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        alert('Settings saved successfully!');
-      } else {
-        alert('Failed to save settings: ' + (data.error || 'Unknown error'));
-      }
-    })
-    .catch(err => {
-      console.error('Error saving settings:', err);
-      alert('Connection error. Failed to save settings.');
-    });
-  });
-
-  // Test Webhook Action
-  testWebhookBtn.addEventListener('click', () => {
-    if (!isAdminAuthenticated || !currentAdminCode) return;
-
-    const webhookUrl = webhookUrlInput.value.trim();
-    if (!webhookUrl) {
-      alert('Please enter a Webhook URL before testing.');
-      webhookUrlInput.focus();
-      return;
-    }
-
-    testWebhookBtn.disabled = true;
-    const originalText = testWebhookBtn.innerHTML;
-    testWebhookBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testing...';
-
-    fetch('/api/settings/test', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ adminCode: currentAdminCode, webhookUrl })
-    })
-    .then(res => res.json())
-    .then(data => {
-      testWebhookBtn.disabled = false;
-      testWebhookBtn.innerHTML = originalText;
-      if (data.success) {
-        alert('Test notification sent successfully! Please check your Discord channel.');
-      } else {
-        alert('Failed to send test: ' + (data.error || 'Unknown error'));
-      }
-    })
-    .catch(err => {
-      testWebhookBtn.disabled = false;
-      testWebhookBtn.innerHTML = originalText;
-      console.error('Error testing webhook:', err);
-      alert('Connection error. Failed to send test notification.');
-    });
-  });
 
   // Update the Active Users List modal content
   function updateActiveUsersList() {

@@ -76,20 +76,7 @@ try {
   console.error('Failed to load application settings:', error);
 }
 
-function saveSettings(settings) {
-  appSettings = {
-    webhookUrl: process.env.DISCORD_WEBHOOK_URL || settings.webhookUrl || '',
-    monitoredUser: process.env.MONITORED_USER || settings.monitoredUser || '',
-    enabled: process.env.DISCORD_ALERTS_ENABLED !== undefined
-      ? process.env.DISCORD_ALERTS_ENABLED === 'true'
-      : !!settings.enabled
-  };
-  try {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(appSettings, null, 2), 'utf-8');
-  } catch (error) {
-    console.error('Failed to write settings to file:', error);
-  }
-}
+
 
 async function sendDiscordWebhook(url, content) {
   const response = await fetch(url, {
@@ -214,46 +201,7 @@ app.post('/api/history', (req, res) => {
   }
 });
 
-// Endpoint to retrieve current settings (guarded by admin code)
-app.post('/api/settings/get', (req, res) => {
-  const { adminCode } = req.body;
-  if (adminCode === ADMIN_CODE) {
-    res.json({ success: true, settings: appSettings });
-  } else {
-    res.status(401).json({ success: false, error: 'Invalid admin passcode. Access denied.' });
-  }
-});
 
-// Endpoint to save settings (guarded by admin code)
-app.post('/api/settings/save', (req, res) => {
-  const { adminCode, settings } = req.body;
-  if (adminCode === ADMIN_CODE) {
-    saveSettings(settings);
-    res.json({ success: true });
-  } else {
-    res.status(401).json({ success: false, error: 'Invalid admin passcode. Access denied.' });
-  }
-});
-
-// Endpoint to test webhook URL (guarded by admin code)
-app.post('/api/settings/test', (req, res) => {
-  const { adminCode, webhookUrl } = req.body;
-  if (adminCode === ADMIN_CODE) {
-    if (!webhookUrl) {
-      return res.status(400).json({ success: false, error: 'Webhook URL is required.' });
-    }
-    sendDiscordWebhook(webhookUrl, "🔔 **Aether Chat**: This is a test notification. Your Discord Webhook integration is working successfully!")
-      .then(() => {
-        res.json({ success: true });
-      })
-      .catch(err => {
-        console.error('Webhook test failed:', err);
-        res.status(500).json({ success: false, error: err.message });
-      });
-  } else {
-    res.status(401).json({ success: false, error: 'Invalid admin passcode. Access denied.' });
-  }
-});
 
 const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
