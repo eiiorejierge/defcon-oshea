@@ -1467,7 +1467,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const shareScreenBtn = document.getElementById('share-screen-btn');
   const theatreScreenBtn = document.getElementById('theatre-screen-btn');
   const fullscreenScreenBtn = document.getElementById('fullscreen-screen-btn');
-  const chatShell = document.getElementById('chat-shell');
 
   function showLocalScreenShare() {
     if (!screenShareViewport) return;
