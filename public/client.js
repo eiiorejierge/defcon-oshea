@@ -67,6 +67,63 @@ document.addEventListener('DOMContentLoaded', () => {
   // Minigame state (client-resolved; server only relays events)
   const activeGames = new Map(); // gameId -> { playerX, playerO, board, turn, status, boardEl }
 
+  // Voice call roster (usernames currently in the Agora voice channel)
+  const voiceMembers = new Set();
+  const voiceRoster = document.getElementById('voice-roster');
+  const voiceRosterList = document.getElementById('voice-roster-list');
+  const voiceRosterCount = document.getElementById('voice-roster-count');
+
+  // Settings (persisted locally). Notification sound is OFF by default.
+  const SETTINGS_KEY = 'noir_settings';
+  let userSettings = { soundNotifications: false };
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    userSettings.soundNotifications = !!saved.soundNotifications;
+  } catch (e) { /* ignore malformed storage */ }
+
+  function saveSettings() {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(userSettings)); } catch (e) { /* ignore */ }
+  }
+
+  // DOM Elements - Settings
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsModal = document.getElementById('settings-modal');
+  const closeSettingsModalBtn = document.getElementById('close-settings-modal-btn');
+  const soundToggle = document.getElementById('sound-toggle');
+
+  // Lazily-created audio context for notification sounds (browsers require a
+  // user gesture before audio can play, hence the lazy resume-on-demand).
+  let audioCtx = null;
+  function ensureAudioContext() {
+    if (!audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      audioCtx = new Ctx();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+    return audioCtx;
+  }
+
+  function playNotificationSound() {
+    const ctx = ensureAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(660, now);
+    osc.frequency.setValueAtTime(880, now + 0.09);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.14, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.32);
+  }
+
   // Focus utility
   const focusElement = (el) => {
     if (el) setTimeout(() => el.focus(), 50);
@@ -129,6 +186,15 @@ document.addEventListener('DOMContentLoaded', () => {
       presenceChannel.bind('pusher:subscription_succeeded', (members) => {
         updateUserCount(members.count);
         updateActiveUsersList();
+        // Bootstrap the voice roster so late joiners see who's already in the call
+        fetch('/api/voice-presence')
+          .then(res => res.json())
+          .then(data => {
+            (data.members || []).forEach(u => voiceMembers.add(u));
+            renderVoiceRoster();
+            updateActiveUsersList();
+          })
+          .catch(() => {});
         messagesContainer.appendChild(createSystemMessageElement({
           text: `Connected to The Lounge as ${currentUsername}. Session is active.`
         }));
@@ -165,8 +231,13 @@ document.addEventListener('DOMContentLoaded', () => {
       // Another member left
       presenceChannel.bind('pusher:member_removed', (member) => {
         updateUserCount(presenceChannel.members.count);
+
+        // If they were in voice, drop them from the roster too (covers closed tabs)
+        if (voiceMembers.delete(member.info.name)) {
+          renderVoiceRoster();
+        }
         updateActiveUsersList();
-        
+
         // Remove from typing list if they were typing
         activeTypingUsers.delete(member.info.name);
         updateTypingIndicator();
@@ -189,10 +260,15 @@ document.addEventListener('DOMContentLoaded', () => {
       // Live message received
       presenceChannel.bind('new-message', (msg) => {
         const isSelf = msg.username === currentUsername;
-        
+
         // Clear typing indicator for this user when they send a message
         activeTypingUsers.delete(msg.username);
         updateTypingIndicator();
+
+        // Notification sound for messages from others while the tab is unfocused
+        if (!isSelf && userSettings.soundNotifications && (document.hidden || !document.hasFocus())) {
+          playNotificationSound();
+        }
 
         // 1. Append to live viewport
         messagesContainer.appendChild(createMessageElement(msg, isSelf, false));
@@ -222,6 +298,18 @@ document.addEventListener('DOMContentLoaded', () => {
       // Broadcast announcement banner updates
       presenceChannel.bind('announcement', (data) => {
         renderAnnouncement(data ? data.announcement : null);
+      });
+
+      // Voice call roster updates (someone joined/left the voice channel)
+      presenceChannel.bind('voice-presence', (data) => {
+        if (!data || !data.username) return;
+        if (data.inVoice) {
+          voiceMembers.add(data.username);
+        } else {
+          voiceMembers.delete(data.username);
+        }
+        renderVoiceRoster();
+        updateActiveUsersList();
       });
 
       // Minigame events (invite / accept / decline / move)
@@ -604,8 +692,59 @@ document.addEventListener('DOMContentLoaded', () => {
 
       li.appendChild(icon);
       li.appendChild(nameSpan);
+
+      // Speaker badge for members currently in the voice call
+      if (voiceMembers.has(username)) {
+        const voiceIcon = document.createElement('i');
+        voiceIcon.classList.add('fa-solid', 'fa-volume-high', 'voice-indicator');
+        voiceIcon.title = 'In voice';
+        li.appendChild(voiceIcon);
+      }
+
       usersList.appendChild(li);
     });
+  }
+
+  // Render the "In Voice" roster in the sidebar
+  function renderVoiceRoster() {
+    if (!voiceRoster || !voiceRosterList) return;
+    voiceRosterList.innerHTML = '';
+
+    const members = Array.from(voiceMembers);
+    if (voiceRosterCount) voiceRosterCount.textContent = members.length;
+
+    if (members.length === 0) {
+      voiceRoster.classList.add('hidden');
+      return;
+    }
+    voiceRoster.classList.remove('hidden');
+
+    members.forEach((username) => {
+      const isSelf = username === currentUsername;
+      const li = document.createElement('li');
+      li.classList.add('voice-roster-item');
+      if (isSelf) li.classList.add('self-item');
+
+      const icon = document.createElement('i');
+      icon.classList.add('fa-solid', 'fa-microphone');
+
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = username + (isSelf ? ' (You)' : '');
+
+      li.appendChild(icon);
+      li.appendChild(nameSpan);
+      voiceRosterList.appendChild(li);
+    });
+  }
+
+  // Broadcast our own voice join/leave so everyone's roster updates
+  function announceVoicePresence(inVoice) {
+    if (!currentUsername) return;
+    fetch('/api/voice-presence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: currentUsername, inVoice })
+    }).catch(err => console.error('Error announcing voice presence:', err));
   }
 
   // Helper to render/update typing indicators
@@ -704,6 +843,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (announceModal && !announceModal.classList.contains('hidden')) {
         announceModal.classList.add('hidden');
+        focusElement(messageInput);
+      }
+      if (settingsModal && !settingsModal.classList.contains('hidden')) {
+        settingsModal.classList.add('hidden');
         focusElement(messageInput);
       }
       hideCommandHints();
@@ -904,6 +1047,44 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     })
     .catch(err => console.error('Error posting announcement:', err));
+  }
+
+  // =====================================================================
+  //  Settings
+  // =====================================================================
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', () => {
+      if (soundToggle) soundToggle.checked = userSettings.soundNotifications;
+      settingsModal.classList.remove('hidden');
+    });
+  }
+
+  if (closeSettingsModalBtn) {
+    closeSettingsModalBtn.addEventListener('click', () => {
+      settingsModal.classList.add('hidden');
+      focusElement(messageInput);
+    });
+  }
+
+  if (settingsModal) {
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) {
+        settingsModal.classList.add('hidden');
+        focusElement(messageInput);
+      }
+    });
+  }
+
+  if (soundToggle) {
+    soundToggle.addEventListener('change', () => {
+      userSettings.soundNotifications = soundToggle.checked;
+      saveSettings();
+      // Turning it on is a user gesture — unlock audio and play a confirmation
+      // chime so it's clear it works.
+      if (soundToggle.checked) {
+        playNotificationSound();
+      }
+    });
   }
 
   // =====================================================================
@@ -1258,11 +1439,17 @@ document.addEventListener('DOMContentLoaded', () => {
       await rtc.client.publish([rtc.localAudioTrack]);
 
       rtc.joined = true;
-      
+
       // Show/Hide UI elements
       joinVoiceBtn.classList.add('hidden');
       voiceControls.classList.remove('hidden');
       voiceStatusText.classList.remove('hidden');
+
+      // Announce ourselves in the voice roster
+      voiceMembers.add(currentUsername);
+      renderVoiceRoster();
+      updateActiveUsersList();
+      announceVoicePresence(true);
 
       // Start initial alone check
       checkAloneStatus();
@@ -1300,6 +1487,12 @@ document.addEventListener('DOMContentLoaded', () => {
     muteVoiceBtn.classList.remove('muted-active');
     muteVoiceBtn.innerHTML = `<i class="fa-solid fa-microphone"></i>`;
 
+    // Remove ourselves from the voice roster
+    voiceMembers.delete(currentUsername);
+    renderVoiceRoster();
+    updateActiveUsersList();
+    announceVoicePresence(false);
+
     console.log("[Agora] Left voice lounge.");
   }
 
@@ -1333,6 +1526,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (rtc.localAudioTrack) {
         rtc.localAudioTrack.close();
       }
+      // Best-effort notify others we left the voice roster
+      try {
+        const blob = new Blob(
+          [JSON.stringify({ username: currentUsername, inVoice: false })],
+          { type: 'application/json' }
+        );
+        navigator.sendBeacon('/api/voice-presence', blob);
+      } catch (e) { /* ignore */ }
     }
   });
 });

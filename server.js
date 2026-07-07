@@ -158,6 +158,37 @@ app.get('/api/voice-token', (req, res) => {
   }
 });
 
+// Who is currently in the voice call (usernames). In-memory; clients also
+// reconcile locally via Pusher presence, so this is just for bootstrapping
+// late joiners.
+const voiceMembers = new Set();
+
+app.get('/api/voice-presence', (req, res) => {
+  res.json({ members: Array.from(voiceMembers) });
+});
+
+// Relay a user's voice join/leave to everyone and track the roster.
+app.post('/api/voice-presence', (req, res) => {
+  const { username, inVoice } = req.body;
+  const cleanUsername = (username || 'Anonymous').trim().substring(0, 25);
+
+  if (inVoice) {
+    voiceMembers.add(cleanUsername);
+  } else {
+    voiceMembers.delete(cleanUsername);
+  }
+
+  pusher.trigger('presence-chat', 'voice-presence', {
+    username: cleanUsername,
+    inVoice: !!inVoice
+  })
+    .then(() => res.json({ success: true, members: Array.from(voiceMembers) }))
+    .catch((err) => {
+      console.error('Voice presence relay error:', err);
+      res.status(500).json({ error: 'Failed to relay voice presence.' });
+    });
+});
+
 // Serve public directory
 app.use(express.static(path.join(__dirname, 'public')));
 

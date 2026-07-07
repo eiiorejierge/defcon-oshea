@@ -73,6 +73,9 @@
           </div>
 
           <div class="chat-header-actions">
+            <button id="settings-btn" class="icon-btn" title="Settings">
+              <i class="fa-solid fa-gear"></i>
+            </button>
             <button id="announce-btn" class="icon-btn hidden" title="Post Announcement">
               <i class="fa-solid fa-bullhorn"></i>
             </button>
@@ -175,6 +178,16 @@
           </div>
         </div>
 
+        <!-- Live roster of who is currently in the voice call -->
+        <div id="voice-roster" class="voice-roster hidden">
+          <div class="voice-roster-title">
+            <span class="pulse-dot-green"></span>
+            <span>In Voice</span>
+            <span id="voice-roster-count" class="voice-roster-count">0</span>
+          </div>
+          <ul id="voice-roster-list"></ul>
+        </div>
+
         <div class="users-list-viewport">
           <ul id="users-list">
             <!-- Dynamically populated -->
@@ -238,6 +251,31 @@
           </button>
           <button type="button" id="clear-announce-btn" class="ghost-btn">Clear current announcement</button>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal-content glass-card scale-up">
+      <header class="modal-header">
+        <div class="admin-icon-container">
+          <i class="fa-solid fa-gear"></i>
+        </div>
+        <h3>Settings</h3>
+        <button id="close-settings-modal-btn" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+      </header>
+      <div class="modal-body">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Notification sound</div>
+            <div class="setting-desc">Play a sound for new messages when this tab isn't focused. Off by default.</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="sound-toggle">
+            <span class="switch-slider"></span>
+          </label>
+        </div>
       </div>
     </div>
   </div>
