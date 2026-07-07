@@ -1890,23 +1890,5 @@ body {
   padding: 40px 0;
 }
 
-/* --- Edit Username button in header --- */
-.edit-name-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 11px;
-  margin-left: 6px;
-  padding: 2px;
-  transition: color 0.2s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-}
 
-.edit-name-btn:hover {
-  color: var(--white);
-}
 
