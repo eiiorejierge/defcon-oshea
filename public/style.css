@@ -907,3 +907,74 @@ body {
   font-weight: 500;
   color: var(--text-main);
 }
+
+/* Header User Alias Info Display */
+.user-separator {
+  color: var(--text-muted);
+  font-size: 10px;
+  margin: 0 4px;
+}
+
+.header-user-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.header-user-label strong {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Active Users Modal List styling */
+.users-list-viewport {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-top: 10px;
+}
+
+.users-list-viewport::-webkit-scrollbar {
+  width: 4px;
+}
+
+.users-list-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+#users-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+}
+
+.user-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--text-main);
+  transition: var(--transition-smooth);
+  text-align: left;
+}
+
+.user-list-item i {
+  color: var(--primary);
+  font-size: 16px;
+}
+
+.user-list-item.self-item {
+  border-color: var(--msg-self-border);
+  background: var(--msg-self);
+}
+
+.user-list-item.self-item i {
+  color: var(--accent);
+}

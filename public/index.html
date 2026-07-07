@@ -62,11 +62,16 @@
             <div class="status-indicator">
               <span class="pulse-dot"></span>
               <span id="active-users-count">Connecting...</span>
+              <span class="user-separator">•</span>
+              <span class="header-user-label">Logged in as: <strong id="header-username">...</strong></span>
             </div>
           </div>
         </div>
 
         <div class="chat-header-actions">
+          <button id="users-toggle-btn" class="icon-btn" title="Active Users">
+            <i class="fa-solid fa-users"></i>
+          </button>
           <button id="admin-toggle-btn" class="icon-btn" title="Admin Archive">
             <i class="fa-solid fa-shield-halved"></i>
           </button>
@@ -197,6 +202,26 @@
             <i class="fa-solid fa-unlock-keyhole"></i>
           </button>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Users Modal Overlay -->
+  <div id="users-modal" class="modal-overlay hidden">
+    <div class="modal-content glass-card scale-up">
+      <header class="modal-header">
+        <div class="admin-icon-container" style="color: var(--success); background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2);">
+          <i class="fa-solid fa-users"></i>
+        </div>
+        <h3>Active Users</h3>
+        <button id="close-users-modal-btn" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+      </header>
+      <div class="modal-body">
+        <div id="users-list-container" class="users-list-viewport">
+          <ul id="users-list">
+            <!-- Dynamically populated -->
+          </ul>
+        </div>
       </div>
     </div>
   </div>

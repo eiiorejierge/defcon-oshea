@@ -42,6 +42,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const webhookEnabledCheckbox = document.getElementById('webhook-enabled-checkbox');
   const testWebhookBtn = document.getElementById('test-webhook-btn');
 
+  // DOM Elements - Active Users & Header
+  const headerUsername = document.getElementById('header-username');
+  const usersToggleBtn = document.getElementById('users-toggle-btn');
+  const usersModal = document.getElementById('users-modal');
+  const closeUsersModalBtn = document.getElementById('close-users-modal-btn');
+  const usersList = document.getElementById('users-list');
+
   // DOM Elements - Admin Modal
   const adminModal = document.getElementById('admin-modal');
   const closeModalBtn = document.getElementById('close-modal-btn');
@@ -60,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const username = usernameInput.value.trim();
     if (username) {
       currentUsername = username;
+      headerUsername.textContent = username;
       
       // Initialize Pusher connection
       initPusher();
@@ -109,6 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Subscription succeeded - retrieve initial online user list
       presenceChannel.bind('pusher:subscription_succeeded', (members) => {
         updateUserCount(members.count);
+        updateActiveUsersList();
         messagesContainer.appendChild(createSystemMessageElement({
           text: `Connected to Aether Room as ${currentUsername}. Session is active.`
         }));
@@ -126,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Another member joined
       presenceChannel.bind('pusher:member_added', (member) => {
         updateUserCount(presenceChannel.members.count);
+        updateActiveUsersList();
         const log = `${member.info.name} joined the chat.`;
         
         // Live View log
@@ -144,6 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Another member left
       presenceChannel.bind('pusher:member_removed', (member) => {
         updateUserCount(presenceChannel.members.count);
+        updateActiveUsersList();
         const log = `${member.info.name} left the chat.`;
 
         // Live View log
@@ -604,11 +615,60 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Update the Active Users List modal content
+  function updateActiveUsersList() {
+    usersList.innerHTML = '';
+    if (!presenceChannel || !presenceChannel.members) return;
+
+    presenceChannel.members.each((member) => {
+      const username = member.info.name;
+      const isSelf = username === currentUsername;
+
+      const li = document.createElement('li');
+      li.classList.add('user-list-item');
+      if (isSelf) {
+        li.classList.add('self-item');
+      }
+
+      const icon = document.createElement('i');
+      icon.classList.add('fa-solid', 'fa-circle-user');
+
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = username + (isSelf ? ' (You)' : '');
+
+      li.appendChild(icon);
+      li.appendChild(nameSpan);
+      usersList.appendChild(li);
+    });
+  }
+
+  // Active Users Modal Bindings
+  usersToggleBtn.addEventListener('click', () => {
+    updateActiveUsersList();
+    usersModal.classList.remove('hidden');
+  });
+
+  closeUsersModalBtn.addEventListener('click', () => {
+    usersModal.classList.add('hidden');
+  });
+
+  usersModal.addEventListener('click', (e) => {
+    if (e.target === usersModal) {
+      usersModal.classList.add('hidden');
+    }
+  });
+
   // Global Keybind: Esc closes modal
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !adminModal.classList.contains('hidden')) {
-      adminModal.classList.add('hidden');
-      focusElement(messageInput);
+    if (e.key === 'Escape') {
+      if (!adminModal.classList.contains('hidden')) {
+        adminModal.classList.add('hidden');
+        focusElement(messageInput);
+      }
+      if (!usersModal.classList.contains('hidden')) {
+        usersModal.classList.add('hidden');
+        focusElement(messageInput);
+      }
     }
   });
 });
