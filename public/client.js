@@ -1824,6 +1824,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Automatically clean up on page close/refresh
   window.addEventListener('beforeunload', () => {
+    // Disconnect Pusher instantly to prevent stale user counts
+    if (pusherInstance) {
+      try {
+        pusherInstance.unsubscribe('presence-chat');
+        pusherInstance.disconnect();
+      } catch (e) { /* ignore */ }
+    }
+
     if (rtc.joined) {
       if (rtc.localAudioTrack) {
         rtc.localAudioTrack.close();
