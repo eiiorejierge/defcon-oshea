@@ -203,6 +203,27 @@ app.post('/api/voice-presence', (req, res) => {
     });
 });
 
+// Endpoint to kick a user from the voice call
+app.post('/api/voice-kick', (req, res) => {
+  const { targetUsername, kickedBy } = req.body;
+  if (!targetUsername) {
+    return res.status(400).json({ error: 'Target username is required.' });
+  }
+
+  const cleanTarget = targetUsername.trim().substring(0, 25);
+  voiceMembers.delete(cleanTarget);
+
+  pusher.trigger('presence-chat', 'voice-kick', {
+    targetUsername: cleanTarget,
+    kickedBy: kickedBy || 'Someone'
+  })
+    .then(() => res.json({ success: true }))
+    .catch((err) => {
+      console.error('Voice kick relay error:', err);
+      res.status(500).json({ error: 'Failed to broadcast voice kick.' });
+    });
+});
+
 // Serve public directory
 app.use(express.static(path.join(__dirname, 'public')));
 

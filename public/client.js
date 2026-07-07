@@ -328,6 +328,30 @@ document.addEventListener('DOMContentLoaded', () => {
         updateActiveUsersList();
       });
 
+      // Voice call kick events (someone was kicked from the channel)
+      presenceChannel.bind('voice-kick', (data) => {
+        if (!data || !data.targetUsername) return;
+        
+        const log = `${data.targetUsername === currentUsername ? 'You have' : `${data.targetUsername} has`} been kicked from the voice lounge by ${data.kickedBy}.`;
+        
+        // Output system message log
+        messagesContainer.appendChild(createSystemMessageElement({ text: log, system: true }));
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+        // Save in archive cached message list if admin authenticated
+        if (isAdminAuthenticated) {
+          archiveMessages.push({ text: log, system: true, timestamp: Date.now() });
+          renderArchive();
+        }
+
+        // If it's us who got kicked, leave the voice channel immediately
+        if (data.targetUsername === currentUsername) {
+          if (rtc.joined) {
+            leaveVoiceChannel();
+          }
+        }
+      });
+
       // Minigame events (invite / accept / decline / move)
       presenceChannel.bind('game', (data) => {
         handleGameEvent(data);
@@ -831,8 +855,32 @@ document.addEventListener('DOMContentLoaded', () => {
         li.appendChild(watchBtn);
       }
 
+      // Kick button for remote users in voice call
+      if (!isSelf) {
+        const kickBtn = document.createElement('button');
+        kickBtn.className = 'kick-member-btn';
+        kickBtn.innerHTML = `<i class="fa-solid fa-user-slash"></i>`;
+        kickBtn.title = `Kick ${username} from Voice Lounge`;
+        kickBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (confirm(`Are you sure you want to kick ${username} from the voice lounge?`)) {
+            kickVoiceUser(username);
+          }
+        });
+        li.appendChild(kickBtn);
+      }
+
       voiceRosterList.appendChild(li);
     });
+  }
+
+  // Trigger a kick request for a specific user in the voice lounge
+  function kickVoiceUser(targetUsername) {
+    fetch('/api/voice-kick', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetUsername, kickedBy: currentUsername })
+    }).catch(err => console.error('Error sending kick request:', err));
   }
 
   // Broadcast our own voice join/leave so everyone's roster updates

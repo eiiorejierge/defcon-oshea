@@ -1961,5 +1961,28 @@ body {
   border: 1px solid rgba(231, 76, 60, 0.3);
 }
 
+/* --- Voice Lounge Member Kick Button --- */
+.kick-member-btn {
+  margin-left: 6px;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(231, 76, 60, 0.12);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.25);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  vertical-align: middle;
+}
+
+.kick-member-btn:hover {
+  background: #e74c3c;
+  color: #fff;
+  border-color: #e74c3c;
+}
+
 
 
