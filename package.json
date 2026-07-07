@@ -8,7 +8,7 @@
     "start": "node server.js",
     "build:exe": "pkg . --targets node18-win-x64 --output dist/lounge-chat.exe",
     "desktop": "electron .",
-    "build:app": "electron-packager . lounge-chat --platform=win32 --arch=x64 --out=dist/app --overwrite --ignore=dist"
+    "build:app": "electron-packager . lounge-chat --platform=win32 --arch=x64 --out=dist/app --overwrite --ignore=\"^dist/\""
   },
   "pkg": {
     "assets": [
