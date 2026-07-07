@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentUsername = '';
   let isAdminAuthenticated = false;
   let activeTab = 'live';
+  let archiveMessages = []; // Cached messages for filtering & downloading
   
   let pusherInstance = null;
   let presenceChannel = null;
@@ -24,6 +25,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const archiveContainer = document.getElementById('archive-container');
   const messageForm = document.getElementById('message-form');
   const messageInput = document.getElementById('message-input');
+
+  // DOM Elements - Admin Controls
+  const adminControls = document.getElementById('admin-controls');
+  const filterUserInput = document.getElementById('filter-user-input');
+  const clearFilterBtn = document.getElementById('clear-filter-btn');
+  const saveChatsBtn = document.getElementById('save-chats-btn');
 
   // DOM Elements - Admin Modal
   const adminModal = document.getElementById('admin-modal');
@@ -110,10 +117,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Archive View log
         if (isAdminAuthenticated) {
-          archiveContainer.appendChild(createSystemMessageElement({ text: log, joined: true }));
-          if (activeTab === 'archive') {
-            archiveContainer.scrollTop = archiveContainer.scrollHeight;
-          }
+          archiveMessages.push({ text: log, joined: true, system: true, timestamp: Date.now() });
+          renderArchive();
         }
       });
 
@@ -130,10 +135,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Archive View log
         if (isAdminAuthenticated) {
-          archiveContainer.appendChild(createSystemMessageElement({ text: log, left: true }));
-          if (activeTab === 'archive') {
-            archiveContainer.scrollTop = archiveContainer.scrollHeight;
-          }
+          archiveMessages.push({ text: log, left: true, system: true, timestamp: Date.now() });
+          renderArchive();
         }
       });
 
@@ -149,10 +152,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 2. Append to archive viewport if unlocked
         if (isAdminAuthenticated) {
-          archiveContainer.appendChild(createMessageElement(msg, isSelf, true));
-          if (activeTab === 'archive') {
-            archiveContainer.scrollTop = archiveContainer.scrollHeight;
-          }
+          archiveMessages.push(msg);
+          renderArchive();
         }
       });
     } catch (error) {
@@ -277,6 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
       adminTabs.classList.toggle('hidden');
       if (adminTabs.classList.contains('hidden')) {
         switchTab('live');
+        adminControls.classList.add('hidden');
         adminToggleBtn.classList.remove('active');
       } else {
         adminToggleBtn.classList.add('active');
@@ -322,22 +324,11 @@ document.addEventListener('DOMContentLoaded', () => {
           adminTabs.classList.remove('hidden');
           adminToggleBtn.classList.add('active');
           
-          // Clear current archive container interface
-          const systemMessageNode = archiveContainer.firstElementChild;
-          archiveContainer.innerHTML = '';
-          if (systemMessageNode) {
-            archiveContainer.appendChild(systemMessageNode);
-          }
-
-          // Populate history messages
-          data.messages.forEach(msg => {
-            if (msg.system) {
-              archiveContainer.appendChild(createSystemMessageElement(msg));
-            } else {
-              const isSelf = msg.username === currentUsername;
-              archiveContainer.appendChild(createMessageElement(msg, isSelf, true));
-            }
-          });
+          // Cache history messages
+          archiveMessages = data.messages || [];
+          
+          // Render the messages using dynamic filter/render logic
+          renderArchive();
 
           // Switch to the archive view tab immediately
           switchTab('archive');
@@ -356,6 +347,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Render function for Archive with filtering
+  function renderArchive() {
+    // Keep first element (the system description banner) if it exists
+    const firstSystemMessage = archiveContainer.querySelector('.system-message');
+    archiveContainer.innerHTML = '';
+    if (firstSystemMessage) {
+      archiveContainer.appendChild(firstSystemMessage);
+    }
+
+    const filterVal = filterUserInput.value.trim().toLowerCase();
+    if (filterVal) {
+      clearFilterBtn.classList.remove('hidden');
+    } else {
+      clearFilterBtn.classList.add('hidden');
+    }
+
+    archiveMessages.forEach(msg => {
+      if (filterVal) {
+        // Skip system log entries when filtering by specific user
+        if (msg.system) return;
+        if (!msg.username || !msg.username.toLowerCase().includes(filterVal)) {
+          return;
+        }
+      }
+
+      if (msg.system) {
+        archiveContainer.appendChild(createSystemMessageElement(msg));
+      } else {
+        const isSelf = msg.username === currentUsername;
+        archiveContainer.appendChild(createMessageElement(msg, isSelf, true));
+      }
+    });
+
+    archiveContainer.scrollTop = archiveContainer.scrollHeight;
+  }
+
   // --- View Switch Tabs ---
   function switchTab(target) {
     if (target === 'live') {
@@ -369,6 +396,9 @@ document.addEventListener('DOMContentLoaded', () => {
       archiveContainer.classList.remove('active-view');
       archiveContainer.classList.add('hidden-view');
       
+      // Hide admin controls in live view
+      adminControls.classList.add('hidden');
+      
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     } else if (target === 'archive') {
       activeTab = 'archive';
@@ -381,12 +411,60 @@ document.addEventListener('DOMContentLoaded', () => {
       messagesContainer.classList.remove('active-view');
       messagesContainer.classList.add('hidden-view');
       
+      // Show admin controls in archive view if authenticated
+      if (isAdminAuthenticated) {
+        adminControls.classList.remove('hidden');
+      }
+      
       archiveContainer.scrollTop = archiveContainer.scrollHeight;
     }
   }
 
   tabLive.addEventListener('click', () => switchTab('live'));
   tabArchive.addEventListener('click', () => switchTab('archive'));
+
+  // --- Search Filter Inputs & Save Events ---
+  filterUserInput.addEventListener('input', () => {
+    renderArchive();
+  });
+
+  clearFilterBtn.addEventListener('click', () => {
+    filterUserInput.value = '';
+    renderArchive();
+    focusElement(filterUserInput);
+  });
+
+  saveChatsBtn.addEventListener('click', () => {
+    if (archiveMessages.length === 0) {
+      alert('No messages found to export.');
+      return;
+    }
+
+    let fileContent = `AETHER CHATROOM ARCHIVE LOG\r\n`;
+    fileContent += `Export Date: ${new Date().toLocaleString()}\r\n`;
+    fileContent += `==================================================\r\n\r\n`;
+
+    archiveMessages.forEach(msg => {
+      const timeStr = new Date(msg.timestamp).toLocaleString();
+      if (msg.system) {
+        fileContent += `[${timeStr}] [SYSTEM LOG] ${msg.text}\r\n`;
+      } else {
+        fileContent += `[${timeStr}] [${msg.username}] ${msg.text}\r\n`;
+      }
+    });
+
+    const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    
+    const downloadLink = document.createElement('a');
+    downloadLink.href = url;
+    downloadLink.download = `chat_log_${Date.now()}.txt`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(url);
+  });
 
   // Global Keybind: Esc closes modal
   window.addEventListener('keydown', (e) => {

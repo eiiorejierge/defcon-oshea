@@ -85,6 +85,21 @@
         </button>
       </div>
 
+      <!-- Admin Controls Container (Visible when in Archive View) -->
+      <div id="admin-controls" class="hidden">
+        <div class="filter-group">
+          <i class="fa-solid fa-filter"></i>
+          <input type="text" id="filter-user-input" placeholder="Filter by user..." autocomplete="off">
+          <button id="clear-filter-btn" class="hidden" title="Clear Filter">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <button id="save-chats-btn" class="action-btn" title="Save all chats to text file">
+          <i class="fa-solid fa-download"></i>
+          <span>Save all chats</span>
+        </button>
+      </div>
+
       <!-- Messages View -->
       <div id="chat-body">
         <!-- Live Messages Container -->
