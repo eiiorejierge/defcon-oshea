@@ -137,6 +137,11 @@ document.addEventListener('DOMContentLoaded', () => {
       currentUsername = username;
       headerUsername.textContent = username;
       
+      // Save to localStorage so it remembers the user next time!
+      try {
+        localStorage.setItem('lounge_username', username);
+      } catch (err) { /* ignore */ }
+      
       // Initialize Pusher connection
       initPusher();
       
@@ -155,6 +160,27 @@ document.addEventListener('DOMContentLoaded', () => {
       focusElement(messageInput);
     }
   });
+
+  // Change username action
+  const changeUsernameBtn = document.getElementById('change-username-btn');
+  if (changeUsernameBtn) {
+    changeUsernameBtn.addEventListener('click', () => {
+      try {
+        localStorage.removeItem('lounge_username');
+      } catch (err) { /* ignore */ }
+      window.location.reload();
+    });
+  }
+
+  // Auto-login if username is already saved in localStorage
+  try {
+    const savedName = localStorage.getItem('lounge_username');
+    if (savedName && usernameInput) {
+      usernameInput.value = savedName;
+      // Trigger submission automatically
+      onboardingForm.dispatchEvent(new Event('submit'));
+    }
+  } catch (err) { /* ignore */ }
 
   // --- Pusher Initialization & Channel Handlers ---
   async function initPusher() {
