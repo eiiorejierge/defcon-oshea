@@ -54,15 +54,22 @@ function saveMessage(msg) {
 
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 let appSettings = {
-  webhookUrl: '',
-  monitoredUser: '',
-  enabled: false
+  webhookUrl: process.env.DISCORD_WEBHOOK_URL || '',
+  monitoredUser: process.env.MONITORED_USER || '',
+  enabled: process.env.DISCORD_ALERTS_ENABLED === 'true'
 };
 
 try {
   if (fs.existsSync(SETTINGS_FILE)) {
     const settingsContent = fs.readFileSync(SETTINGS_FILE, 'utf-8');
-    appSettings = JSON.parse(settingsContent);
+    const parsedSettings = JSON.parse(settingsContent);
+    appSettings = {
+      webhookUrl: process.env.DISCORD_WEBHOOK_URL || parsedSettings.webhookUrl || '',
+      monitoredUser: process.env.MONITORED_USER || parsedSettings.monitoredUser || '',
+      enabled: process.env.DISCORD_ALERTS_ENABLED !== undefined
+        ? process.env.DISCORD_ALERTS_ENABLED === 'true'
+        : (parsedSettings.enabled !== undefined ? parsedSettings.enabled : false)
+    };
     console.log('Loaded application settings successfully.');
   }
 } catch (error) {
@@ -71,9 +78,11 @@ try {
 
 function saveSettings(settings) {
   appSettings = {
-    webhookUrl: settings.webhookUrl || '',
-    monitoredUser: settings.monitoredUser || '',
-    enabled: !!settings.enabled
+    webhookUrl: process.env.DISCORD_WEBHOOK_URL || settings.webhookUrl || '',
+    monitoredUser: process.env.MONITORED_USER || settings.monitoredUser || '',
+    enabled: process.env.DISCORD_ALERTS_ENABLED !== undefined
+      ? process.env.DISCORD_ALERTS_ENABLED === 'true'
+      : !!settings.enabled
   };
   try {
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(appSettings, null, 2), 'utf-8');
