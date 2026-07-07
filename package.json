@@ -1,0 +1,21 @@
+{
+  "name": "railway-chat-app",
+  "version": "1.0.0",
+  "description": "Sleek real-time messaging app with admin history and Pusher synchronization, deployable to Railway.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "chat",
+    "railway",
+    "pusher",
+    "express"
+  ],
+  "author": "Antigravity",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "pusher": "^5.2.0"
+  }
+}

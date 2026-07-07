@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aether Chat | Real-time Messaging</title>
+  <meta name="description" content="Experience fluid, real-time messaging with instant connection, customizable aliases, and secure administrative archive tools.">
+  
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-background">
+    <div class="circle circle-1"></div>
+    <div class="circle circle-2"></div>
+  </div>
+
+  <main id="app-container">
+    <!-- Onboarding Screen -->
+    <section id="onboarding-screen" class="glass-card fade-in">
+      <header class="onboarding-header">
+        <div class="logo-container">
+          <i class="fa-solid fa-cloud-bolt logo-icon"></i>
+        </div>
+        <h1>Welcome to Aether Chat</h1>
+        <p class="subtitle">Select your alias to begin messaging</p>
+      </header>
+
+      <form id="onboarding-form">
+        <div class="input-group">
+          <label for="username-input">Choose your username</label>
+          <div class="input-wrapper">
+            <i class="fa-solid fa-user input-icon"></i>
+            <input type="text" id="username-input" placeholder="e.g., StarGazer" maxlength="25" required autocomplete="off">
+          </div>
+        </div>
+
+        <button type="submit" id="join-chat-btn" class="primary-btn">
+          <span>Enter Chatroom</span>
+          <i class="fa-solid fa-arrow-right-to-bracket"></i>
+        </button>
+      </form>
+    </section>
+
+    <!-- Chat Screen (Hidden by default) -->
+    <section id="chat-screen" class="glass-card hidden">
+      <!-- Chat Header -->
+      <header id="chat-header">
+        <div class="chat-header-info">
+          <div class="logo-container-small">
+            <i class="fa-solid fa-cloud-bolt logo-icon-small"></i>
+          </div>
+          <div>
+            <h2>Aether Room</h2>
+            <div class="status-indicator">
+              <span class="pulse-dot"></span>
+              <span id="active-users-count">Connecting...</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-header-actions">
+          <button id="admin-toggle-btn" class="icon-btn" title="Admin Archive">
+            <i class="fa-solid fa-shield-halved"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- View Switcher (Visible only if admin is logged in) -->
+      <div id="admin-tabs" class="hidden">
+        <button id="tab-live" class="tab-btn active">
+          <i class="fa-solid fa-comments"></i>
+          Live Chat
+        </button>
+        <button id="tab-archive" class="tab-btn">
+          <i class="fa-solid fa-box-archive"></i>
+          Server Archive
+        </button>
+      </div>
+
+      <!-- Messages View -->
+      <div id="chat-body">
+        <!-- Live Messages Container -->
+        <div id="messages-container" class="messages-viewport active-view">
+          <div class="system-message">
+            <span class="sys-text">Welcome to the ephemeral session. Refreshing the browser will clear this view.</span>
+          </div>
+        </div>
+
+        <!-- Archive Messages Container (Hidden by default) -->
+        <div id="archive-container" class="messages-viewport hidden-view">
+          <div class="system-message">
+            <span class="sys-text"><i class="fa-solid fa-shield-halved"></i> Server history view. All past messages since server start are listed here.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer / Input Bar -->
+      <footer id="chat-footer">
+        <form id="message-form">
+          <input type="text" id="message-input" placeholder="Type a message..." maxlength="1000" required autocomplete="off">
+          <button type="submit" id="send-message-btn" class="primary-btn-circle" title="Send Message">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </form>
+      </footer>
+    </section>
+  </main>
+
+  <!-- Admin Passcode Modal -->
+  <div id="admin-modal" class="modal-overlay hidden">
+    <div class="modal-content glass-card scale-up">
+      <header class="modal-header">
+        <div class="admin-icon-container">
+          <i class="fa-solid fa-lock"></i>
+        </div>
+        <h3>Admin Verification</h3>
+        <button id="close-modal-btn" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+      </header>
+      <div class="modal-body">
+        <p>Enter the admin passcode to retrieve full message history from the server.</p>
+        <form id="admin-form">
+          <div class="input-group">
+            <div class="input-wrapper">
+              <i class="fa-solid fa-key input-icon"></i>
+              <input type="password" id="admin-code-input" placeholder="Enter Admin Code" required autocomplete="off">
+            </div>
+            <div id="admin-error-msg" class="error-msg hidden">Invalid passcode. Try again.</div>
+          </div>
+          <button type="submit" id="verify-admin-btn" class="primary-btn">
+            <span>Unlock Archive</span>
+            <i class="fa-solid fa-unlock-keyhole"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pusher Client Library -->
+  <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
