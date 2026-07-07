@@ -1675,6 +1675,7 @@ body {
   border: 1px solid var(--line);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  transition: flex 0.3s ease;
 }
 
 #screen-share-viewport.hidden {
@@ -1699,10 +1700,43 @@ body {
   gap: 8px;
 }
 
+.video-window-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.video-window-controls .icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  transition: color 0.2s;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+
+.video-window-controls .icon-btn:hover {
+  color: var(--white);
+}
+
 #screen-share-player {
   flex: 1;
   background: #000;
   position: relative;
+}
+
+/* --- Theatre Mode Focus --- */
+#chat-shell.theatre-mode #chat-screen {
+  display: none !important;
+}
+
+#chat-shell.theatre-mode #screen-share-viewport {
+  flex: 1;
 }
 
 /* --- Watch Stream Button (Voice Roster) --- */

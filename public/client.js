@@ -1439,6 +1439,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const screenSharePlayer = document.getElementById('screen-share-player');
   const closeScreenBtn = document.getElementById('close-screen-btn');
   const shareScreenBtn = document.getElementById('share-screen-btn');
+  const theatreScreenBtn = document.getElementById('theatre-screen-btn');
+  const fullscreenScreenBtn = document.getElementById('fullscreen-screen-btn');
+  const chatShell = document.getElementById('chat-shell');
 
   function showLocalScreenShare() {
     if (!screenShareViewport) return;
@@ -1453,6 +1456,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function hideLocalScreenShare() {
     if (rtc.localVideoTrack) {
       rtc.localVideoTrack.stop();
+    }
+    if (chatShell) {
+      chatShell.classList.remove('theatre-mode');
+    }
+    if (theatreScreenBtn) {
+      theatreScreenBtn.innerHTML = `<i class="fa-solid fa-circle-half-stroke"></i>`;
+      theatreScreenBtn.title = "Theatre Mode";
     }
     if (screenShareViewport) {
       screenShareViewport.classList.add('hidden');
@@ -1474,6 +1484,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function hideRemoteScreenShare(user) {
     if (user && user.videoTrack) {
       user.videoTrack.stop();
+    }
+    if (chatShell) {
+      chatShell.classList.remove('theatre-mode');
+    }
+    if (theatreScreenBtn) {
+      theatreScreenBtn.innerHTML = `<i class="fa-solid fa-circle-half-stroke"></i>`;
+      theatreScreenBtn.title = "Theatre Mode";
     }
     if (screenShareViewport) {
       screenShareViewport.classList.add('hidden');
@@ -1765,6 +1782,38 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           if (screenShareViewport) screenShareViewport.classList.add('hidden');
         }
+      }
+    });
+  }
+
+  if (theatreScreenBtn && chatShell) {
+    theatreScreenBtn.addEventListener('click', () => {
+      const isTheatre = chatShell.classList.toggle('theatre-mode');
+      theatreScreenBtn.innerHTML = isTheatre 
+        ? `<i class="fa-solid fa-table-columns"></i>`
+        : `<i class="fa-solid fa-circle-half-stroke"></i>`;
+      theatreScreenBtn.title = isTheatre ? "Show Chat" : "Theatre Mode";
+    });
+  }
+
+  if (fullscreenScreenBtn && screenSharePlayer) {
+    fullscreenScreenBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        screenSharePlayer.requestFullscreen().catch(err => {
+          console.error("[Agora] Fullscreen failed:", err);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      if (document.fullscreenElement === screenSharePlayer) {
+        fullscreenScreenBtn.innerHTML = `<i class="fa-solid fa-compress"></i>`;
+        fullscreenScreenBtn.title = "Exit Fullscreen";
+      } else {
+        fullscreenScreenBtn.innerHTML = `<i class="fa-solid fa-expand"></i>`;
+        fullscreenScreenBtn.title = "Fullscreen";
       }
     });
   }
