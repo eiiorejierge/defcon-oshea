@@ -163,7 +163,7 @@ app.post('/api/messages', (req, res) => {
         const msgUser = cleanUsername.toLowerCase().trim();
         const targetUser = appSettings.monitoredUser.toLowerCase().trim();
         if (msgUser === targetUser) {
-          const alertContent = `⚠️ **Aether Chatroom Notification**\nUser **${cleanUsername}** sent a message:\n> ${cleanText}`;
+          const alertContent = `@everyone ⚠️ **Aether Chatroom Notification**\nUser **${cleanUsername}** sent a message:\n> ${cleanText}`;
           sendDiscordWebhook(appSettings.webhookUrl, alertContent)
             .catch(err => console.error('Failed to dispatch Discord webhook alert:', err));
         }
