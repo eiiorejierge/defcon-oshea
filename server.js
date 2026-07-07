@@ -10,7 +10,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const PORT = process.env.PORT || 3000;
-const ADMIN_CODE = process.env.ADMIN_CODE || 'admin123';
+const ADMIN_CODE = process.env.ADMIN_CODE || '723801';
 
 // Pusher credentials fallback structure
 const pusher = new Pusher({
