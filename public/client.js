@@ -7,6 +7,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeTab = 'live';
   let archiveMessages = []; // Cached messages for filtering & downloading
   
+  // Typing Indicator state
+  let activeTypingUsers = new Set();
+  let typingTimeout = null;
+  let isCurrentlyTyping = false;
+  
   let pusherInstance = null;
   let presenceChannel = null;
 
@@ -155,6 +160,11 @@ document.addEventListener('DOMContentLoaded', () => {
       presenceChannel.bind('pusher:member_removed', (member) => {
         updateUserCount(presenceChannel.members.count);
         updateActiveUsersList();
+        
+        // Remove from typing list if they were typing
+        activeTypingUsers.delete(member.info.name);
+        updateTypingIndicator();
+
         const log = `${member.info.name} left the chat.`;
 
         // Live View log
@@ -174,6 +184,10 @@ document.addEventListener('DOMContentLoaded', () => {
       presenceChannel.bind('new-message', (msg) => {
         const isSelf = msg.username === currentUsername;
         
+        // Clear typing indicator for this user when they send a message
+        activeTypingUsers.delete(msg.username);
+        updateTypingIndicator();
+
         // 1. Append to live viewport
         messagesContainer.appendChild(createMessageElement(msg, isSelf, false));
         if (activeTab === 'live') {
@@ -185,6 +199,18 @@ document.addEventListener('DOMContentLoaded', () => {
           archiveMessages.push(msg);
           renderArchive();
         }
+      });
+
+      // Real-time typing event received from another client
+      presenceChannel.bind('client-typing', (data) => {
+        if (data.username === currentUsername) return;
+        
+        if (data.isTyping) {
+          activeTypingUsers.add(data.username);
+        } else {
+          activeTypingUsers.delete(data.username);
+        }
+        updateTypingIndicator();
       });
     } catch (error) {
       console.error('Error initializing Pusher config:', error);
@@ -204,6 +230,15 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const text = messageInput.value.trim();
     if (text) {
+      // Reset typing state immediately
+      if (isCurrentlyTyping) {
+        isCurrentlyTyping = false;
+        clearTimeout(typingTimeout);
+        if (presenceChannel) {
+          presenceChannel.trigger('client-typing', { username: currentUsername, isTyping: false });
+        }
+      }
+
       fetch('/api/messages', {
         method: 'POST',
         headers: {
@@ -656,6 +691,78 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === usersModal) {
       usersModal.classList.add('hidden');
     }
+  });
+
+  // Helper to render/update typing indicators
+  function updateTypingIndicator() {
+    let typingDiv = document.getElementById('typing-indicator');
+    
+    if (activeTypingUsers.size > 0) {
+      // Build display text
+      const usersArray = Array.from(activeTypingUsers);
+      let text = '';
+      if (usersArray.length === 1) {
+        text = `${usersArray[0]} is typing...`;
+      } else if (usersArray.length === 2) {
+        text = `${usersArray[0]} and ${usersArray[1]} are typing...`;
+      } else {
+        text = `Several people are typing...`;
+      }
+      
+      // Determine if scroll is near bottom
+      const isNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 50;
+
+      if (!typingDiv) {
+        typingDiv = document.createElement('div');
+        typingDiv.id = 'typing-indicator';
+        typingDiv.classList.add('message', 'other');
+        
+        const metaDiv = document.createElement('div');
+        metaDiv.classList.add('message-meta');
+        const nameSpan = document.createElement('span');
+        nameSpan.classList.add('msg-username');
+        metaDiv.appendChild(nameSpan);
+        
+        const bubbleDiv = document.createElement('div');
+        bubbleDiv.classList.add('message-content', 'typing-bubble');
+        
+        for (let i = 0; i < 3; i++) {
+          const dot = document.createElement('div');
+          dot.classList.add('typing-dot');
+          bubbleDiv.appendChild(dot);
+        }
+        
+        typingDiv.appendChild(metaDiv);
+        typingDiv.appendChild(bubbleDiv);
+        messagesContainer.appendChild(typingDiv);
+      }
+      
+      typingDiv.querySelector('.msg-username').textContent = text;
+      
+      if (isNearBottom) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    } else {
+      if (typingDiv) {
+        typingDiv.remove();
+      }
+    }
+  }
+
+  // --- Message Input Typing Event Triggers ---
+  messageInput.addEventListener('input', () => {
+    if (!presenceChannel || !currentUsername) return;
+
+    if (!isCurrentlyTyping) {
+      isCurrentlyTyping = true;
+      presenceChannel.trigger('client-typing', { username: currentUsername, isTyping: true });
+    }
+
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      isCurrentlyTyping = false;
+      presenceChannel.trigger('client-typing', { username: currentUsername, isTyping: false });
+    }, 2500);
   });
 
   // Global Keybind: Esc closes modal
