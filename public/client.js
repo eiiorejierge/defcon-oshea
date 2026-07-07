@@ -1567,6 +1567,10 @@ document.addEventListener('DOMContentLoaded', () => {
       rtc.localVideoTrack.close();
       rtc.localVideoTrack = null;
     }
+    if (rtc.localScreenAudioTrack) {
+      rtc.localScreenAudioTrack.close();
+      rtc.localScreenAudioTrack = null;
+    }
     rtc.sharingScreen = false;
     if (shareScreenBtn) {
       shareScreenBtn.classList.remove('share-active');
@@ -1633,15 +1637,24 @@ document.addEventListener('DOMContentLoaded', () => {
           rtc.localVideoTrack.close();
           rtc.localVideoTrack = null;
         }
+        if (rtc.localScreenAudioTrack) {
+          await rtc.client.unpublish([rtc.localScreenAudioTrack]);
+          rtc.localScreenAudioTrack.close();
+          rtc.localScreenAudioTrack = null;
+        }
         rtc.sharingScreen = false;
         shareScreenBtn.classList.remove('share-active');
         shareScreenBtn.innerHTML = `<i class="fa-solid fa-desktop"></i>`;
         hideLocalScreenShare();
       } else {
-        rtc.localVideoTrack = await AgoraRTC.createScreenVideoTrack({
+        const screenTrack = await AgoraRTC.createScreenVideoTrack({
           encoderConfig: "1080p_1", // 1080p 15fps, detail optimized
           optimizationMode: "detail"
         }, "auto");
+
+        // Agora can return [videoTrack, audioTrack] or just a single videoTrack
+        rtc.localVideoTrack = Array.isArray(screenTrack) ? screenTrack[0] : screenTrack;
+        rtc.localScreenAudioTrack = Array.isArray(screenTrack) ? screenTrack[1] : null;
 
         rtc.localVideoTrack.on("track-ended", () => {
           if (rtc.sharingScreen) {
@@ -1649,7 +1662,12 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
 
-        await rtc.client.publish([rtc.localVideoTrack]);
+        const tracksToPublish = [rtc.localVideoTrack];
+        if (rtc.localScreenAudioTrack) {
+          tracksToPublish.push(rtc.localScreenAudioTrack);
+        }
+
+        await rtc.client.publish(tracksToPublish);
         rtc.sharingScreen = true;
         shareScreenBtn.classList.add('share-active');
         shareScreenBtn.innerHTML = `<i class="fa-solid fa-desktop-slash"></i>`;
