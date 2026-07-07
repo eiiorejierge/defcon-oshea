@@ -149,7 +149,9 @@ app.get('/api/voice-token', (req, res) => {
       role,
       privilegeExpiredTs
     );
-    res.json({ success: true, token });
+    // Return the App ID / channel / uid too so the client joins with values
+    // that always match the token (single source of truth = server env).
+    res.json({ success: true, token, appId, channel: channelName, uid });
   } catch (err) {
     console.error('Agora token generation error:', err);
     res.status(500).json({ error: 'Failed to generate token.' });

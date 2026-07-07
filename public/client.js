@@ -1138,6 +1138,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Agora Voice Call Integration (Super Barebones) ---
+  // These are only fallbacks — the server returns the authoritative App ID and
+  // channel alongside each token so the two can never drift out of sync.
   const AGORA_APP_ID = "9f05b55c788b47f3a11622bd8ac945ad";
   const VOICE_CHANNEL = "lounge-voice";
 
@@ -1225,19 +1227,24 @@ document.addEventListener('DOMContentLoaded', () => {
         checkAloneStatus();
       });
 
-      // Fetch dynamic token from server
+      // Fetch dynamic token (and its matching App ID / channel / uid) from the server
       const tokenRes = await fetch('/api/voice-token');
-      if (!tokenRes.ok) {
-        throw new Error('Failed to retrieve voice access token.');
-      }
-      const tokenData = await tokenRes.json();
-      if (!tokenData.success || !tokenData.token) {
-        throw new Error(tokenData.error || 'Invalid voice token received.');
+      const tokenData = await tokenRes.json().catch(() => ({}));
+      if (!tokenRes.ok || !tokenData.success || !tokenData.token) {
+        // Surface the real server-side reason instead of a generic message
+        // (e.g. "Agora credentials are not configured on the server.")
+        throw new Error(tokenData.error || `Failed to retrieve voice access token (HTTP ${tokenRes.status}).`);
       }
       const token = tokenData.token;
 
-      // 3. Join channel (with dynamic token and uid = 0)
-      await rtc.client.join(AGORA_APP_ID, VOICE_CHANNEL, token, 0);
+      // The server is the single source of truth for these — using its values
+      // guarantees the join matches exactly what the token was signed for.
+      const appId = tokenData.appId || AGORA_APP_ID;
+      const channel = tokenData.channel || VOICE_CHANNEL;
+      const uid = (tokenData.uid !== undefined && tokenData.uid !== null) ? tokenData.uid : 0;
+
+      // 3. Join channel with the server-provided credentials
+      await rtc.client.join(appId, channel, token, uid);
 
       // 4. Create local audio track from microphone
       rtc.localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
